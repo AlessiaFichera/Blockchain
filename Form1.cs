@@ -1,113 +1,166 @@
-namespace Blockchain;
 using System;
 using System.Drawing;
 using System.Windows.Forms;
-public partial class Form1 : Form
+using System.Collections.Generic;
+using Blockchain.Core; // Namespace dedicato alla logica di business
+
+namespace Blockchain
 {
-    public Form1()
+    public partial class Form1 : Form
     {
-        InitializeComponent();
-        
-        // Colleghiamo l'evento a tutti i bottoni
-        btnVisualizzaBlockchain.Click += (s, e) => EntraInModalitaDettaglio("BLOCKCHAIN");
-        btnAggiungiWallet.Click += (s, e) =>EntraInModalitaDettaglio("WALLET");
-        btnInviaTransazione.Click += (s, e) =>EntraInModalitaDettaglio("TRANSAZIONE");
+        // 1. Orientamento ai Componenti: definiamo il gestore della logica come campo privato
+        // Questo garantisce che la logica sia separata dall'interfaccia.
+        private readonly BlockchainManager _blockchainManager;
 
-    }
-    private void EntraInModalitaDettaglio(string modalita)
-    {
-        // 1. Sposta i bottoni nella barra laterale
-        btnAggiungiWallet.Dock = DockStyle.Top;
-        btnInviaTransazione.Dock = DockStyle.Top;
-        btnVisualizzaBlockchain.Dock = DockStyle.Top;
-
-        pnlDettaglio.Controls.Add(btnAggiungiWallet);
-        pnlDettaglio.Controls.Add(btnInviaTransazione);
-        pnlDettaglio.Controls.Add(btnVisualizzaBlockchain);
-
-        pnlDettaglio.Visible = true;
-        lblTitle.Visible = true;
-        lblTitle.Parent = pnlHeaderDettaglio;
-        lblTitle.Location = new Point(250, 10);
-        lblTitle.BringToFront();
-        pnlHeaderDettaglio.Visible = true;
-
-        if (modalita == "BLOCKCHAIN")
+        public Form1()
         {
-            CaricaBlocchiGrafici();
-        }
-    }
-    private void CaricaBlocchiGrafici()
-    {
-    pnlContainer.Controls.Clear();
-    pnlContainer.AutoScroll = true; 
+            InitializeComponent();
 
-    int coordinataX = 20; 
+            // Inizializzazione della logica
+            _blockchainManager = new BlockchainManager();
 
-    for (int i = 1; i <= 5; i++)// Creiamo 5 blocchi di esempio
-    {
-        // Creiamo il blocco grafico (Panel)
-        Panel blocco = CreaSingoloBlocco(i.ToString(), "HASH: 000abc...12f", i != 3);
-        blocco.Location = new Point(coordinataX, 100); // Posizionato al centro altezza
-        
-        pnlContainer.Controls.Add(blocco);
+            // 2. Gestione Eventi Standard: usiamo il pattern EventHandler 
+            btnVisualizzaBlockchain.Click += BtnVisualizzaBlockchain_Click;
+            btnAggiungiWallet.Click += BtnAggiungiWallet_Click;
+            btnInviaTransazione.Click += BtnInviaTransazione_Click;
 
-        // Aggiungiamo una freccia tra i blocchi (tranne che dopo l'ultimo)
-        if (i < 5)
-        {
-            Label freccia = new Label();
-            freccia.Text = "➔";
-            freccia.ForeColor = Color.FromArgb(41, 171, 226);
-            freccia.Font = new Font("Segoe UI", 20, FontStyle.Bold);
-            freccia.Location = new Point(coordinataX + 215, 170);
-            freccia.AutoSize = true;
-            pnlContainer.Controls.Add(freccia);
+            // Sottoscrizione all'evento della logica per aggiornamenti in tempo reale
+            _blockchainManager.BlockAdded += BlockchainManager_BlockAdded;
         }
 
-        coordinataX += 280; // Spostiamo il prossimo blocco più a destra
+        // 3. Metodi Handler: rispettano la firma (object sender, EventArgs e)
+        private void BtnVisualizzaBlockchain_Click(object? sender, EventArgs e)
+        {
+            EntraInModalitaDettaglio("BLOCKCHAIN");
+        }
+
+        private void BtnAggiungiWallet_Click(object? sender, EventArgs e)
+        {
+            EntraInModalitaDettaglio("WALLET");
+        }
+
+        private void BtnInviaTransazione_Click(object? sender, EventArgs e)
+        {
+            EntraInModalitaDettaglio("TRANSAZIONE");
+        }
+
+        private void BlockchainManager_BlockAdded(object? sender, BlockAddedEventArgs e)
+        {
+            // Notifica all'utente che un nuovo oggetto (blocco) è stato creato,testato + avanti
+            MessageBox.Show($"Nuovo blocco aggiunto: {e.NewBlock.Index}", "Blockchain Update", MessageBoxButtons.OK, MessageBoxIcon.Information);
+        }
+
+        private void EntraInModalitaDettaglio(string modalita)
+{
+    
+    btnAggiungiWallet.Dock = DockStyle.Top;
+    btnInviaTransazione.Dock = DockStyle.Top;
+    btnVisualizzaBlockchain.Dock = DockStyle.Top;
+
+    pnlDettaglio.Controls.Add(btnAggiungiWallet);
+    pnlDettaglio.Controls.Add(btnInviaTransazione);
+    pnlDettaglio.Controls.Add(btnVisualizzaBlockchain);
+
+    
+    pnlDettaglio.Visible = true;
+    pnlHeaderDettaglio.Visible = true;
+
+    
+    lblTitle.Visible = true;
+    lblTitle.Parent = pnlHeaderDettaglio;
+    lblTitle.Location = new Point(250, 10);
+    lblTitle.BringToFront();
+
+    // Carichiamo i dati specifici in base alla modalità selezionata
+    if (modalita == "BLOCKCHAIN")
+    {
+        CaricaBlocchiGrafici();
     }
 }
+        private void CaricaBlocchiGrafici()
+        {
+            pnlContainer.Controls.Clear();
+            pnlContainer.AutoScroll = true; 
 
-private Panel CreaSingoloBlocco(string id, string hash, bool isValid)
-{
-    Panel card = new Panel();
-    card.Size = new Size(210, 200);
-    card.BackColor = Color.White;
-    card.BorderStyle = BorderStyle.FixedSingle;
+            int coordinataX = 20; 
 
-    // Header Azzurro
-    Label lblHeader = new Label();
-    lblHeader.Text = "🔒 BLOCK #" + id;
-    lblHeader.BackColor = Color.FromArgb(41, 171, 226);
-    lblHeader.ForeColor = Color.White;
-    lblHeader.Dock = DockStyle.Top;
-    lblHeader.Height = 30;
-    lblHeader.TextAlign = ContentAlignment.MiddleCenter;
-    lblHeader.Font = new Font("Segoe UI", 10, FontStyle.Bold);
+            // 4. Type Safety: Iteriamo sulla collezione generica della logica
+            var catena = _blockchainManager.Chain;
 
-    // Hash (Sfondo scuro come immagine)
-    Label lblHash = new Label();
-    lblHash.Text = hash;
-    lblHash.BackColor = Color.FromArgb(45, 45, 45);
-    lblHash.ForeColor = Color.White;
-    lblHash.Location = new Point(10, 60);
-    lblHash.Size = new Size(190, 25);
-    lblHash.TextAlign = ContentAlignment.MiddleCenter;
+            foreach (var bloccoDati in catena)
+            {
+                // Creiamo l'istanza grafica basandoci sui metadati dell'oggetto blocco
+                Panel bloccoGrafico = CreaSingoloBlocco(
+                    bloccoDati.Index.ToString(), 
+                    bloccoDati.Hash, 
+                    true
+                );
+                
+                bloccoGrafico.Location = new Point(coordinataX, 100);
+                pnlContainer.Controls.Add(bloccoGrafico);
 
-    // Stato in fondo
-    Label lblStatus = new Label();
-    lblStatus.Text = isValid ? "Stato: VALIDO" : "Stato: MODIFICATO!";
-    lblStatus.ForeColor = isValid ? Color.Green : Color.Red;
-    lblStatus.Dock = DockStyle.Bottom;
-    lblStatus.TextAlign = ContentAlignment.MiddleCenter;
-    lblStatus.Height = 30;
+                // Aggiungiamo la freccia se non è l'ultimo elemento
+                if (bloccoDati.Index < catena.Count - 1)
+                {
+                    Label freccia = new Label
+                    {
+                        Text = "➔",
+                        ForeColor = Color.FromArgb(41, 171, 226),
+                        Font = new Font("Segoe UI", 20, FontStyle.Bold),
+                        Location = new Point(coordinataX + 215, 170),
+                        AutoSize = true
+                    };
+                    pnlContainer.Controls.Add(freccia);
+                }
 
-    card.Controls.Add(lblHash);
-    card.Controls.Add(lblHeader);
-    card.Controls.Add(lblStatus);
+                coordinataX += 280;
+            }
+        }
 
-    return card;
-    }       
+        private Panel CreaSingoloBlocco(string id, string hash, bool isValid)
+        {
+            Panel card = new Panel
+            {
+                Size = new Size(210, 200),
+                BackColor = Color.White,
+                BorderStyle = BorderStyle.FixedSingle
+            };
+
+            Label lblHeader = new Label
+            {
+                Text = "🔒 BLOCK #" + id,
+                BackColor = Color.FromArgb(41, 171, 226),
+                ForeColor = Color.White,
+                Dock = DockStyle.Top,
+                Height = 30,
+                TextAlign = ContentAlignment.MiddleCenter,
+                Font = new Font("Segoe UI", 10, FontStyle.Bold)
+            };
+
+            Label lblHash = new Label
+            {
+                Text = hash.Length > 15 ? hash.Substring(0, 15) + "..." : hash,
+                BackColor = Color.FromArgb(45, 45, 45),
+                ForeColor = Color.White,
+                Location = new Point(10, 60),
+                Size = new Size(190, 25),
+                TextAlign = ContentAlignment.MiddleCenter
+            };
+
+            Label lblStatus = new Label
+            {
+                Text = isValid ? "Stato: VALIDO" : "Stato: CORROTTO!",
+                ForeColor = isValid ? Color.Green : Color.Red,
+                Dock = DockStyle.Bottom,
+                TextAlign = ContentAlignment.MiddleCenter,
+                Height = 30
+            };
+
+            card.Controls.Add(lblHash);
+            card.Controls.Add(lblHeader);
+            card.Controls.Add(lblStatus);
+
+            return card;
+        }       
+    }
 }
-        
-
