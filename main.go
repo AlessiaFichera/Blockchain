@@ -1,22 +1,34 @@
 package main
 
 import (
-	"fmt"
-	"strconv"
+	"log"
 )
 
 func main() {
-	bc := NewBlockchain()
-
-	bc.AddBlock("Send 1 BTC to Ivan")
-	bc.AddBlock("Send 2 more BTC to Ivan")
-
-	for _, block := range bc.blocks {
-		fmt.Printf("Prev. hash: %x\n", block.PrevBlockHash)
-		fmt.Printf("Data: %s\n", block.Data)
-		fmt.Printf("Hash: %x\n", block.Hash)
-		pow := NewProofOfWork(block)
-		fmt.Printf("PoW: %s\n", strconv.FormatBool(pow.Validate()))
-		fmt.Println()
+	storage, err := NewBoltStorage("blockchain.db")
+	if err != nil {
+		log.Panic(err)
 	}
+	defer storage.Close()
+
+	bc, err := NewBlockchain(storage)
+	if err != nil {
+		log.Panic(err)
+	}
+
+	err = bc.AddBlock("Inviato 1 BTC a Mario")
+	if err != nil {
+		log.Printf("Errore aggiunta blocco 1: %s", err)
+	}
+
+	err = bc.AddBlock("Inviato 2 BTC a Giovanni")
+	if err != nil {
+		log.Printf("Errore aggiunta blocco 2: %s", err)
+	}
+
+	err = bc.PrintBlockchain()
+	if err != nil {
+		log.Printf("Errore durante la stampa della catena: %v", err)
+	}
+
 }
