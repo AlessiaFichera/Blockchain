@@ -4,7 +4,7 @@ import (
 	"time"
 )
 
-// Block contiene gli header dei blocchi
+// Rappresenta un blocco della catena
 type Block struct {
 	Timestamp     int64
 	Data          []byte
@@ -13,19 +13,21 @@ type Block struct {
 	Nonce         int
 }
 
-// NewBlock crea e restituisce un blocco
+// Restituisce un nuovo blocco
 func NewBlock(data string, prevBlockHash []byte) *Block {
-	block := &Block{time.Now().Unix(), []byte(data), prevBlockHash, []byte{}, 0}
-	pow := NewProofOfWork(block)
-	nonce, hash := pow.Run()
+	block := &Block{
+		Timestamp:     time.Now().Unix(),
+		Data:          []byte(data),
+		PrevBlockHash: prevBlockHash,
+	}
 
-	block.Hash = hash[:]
-	block.Nonce = nonce
+	pow := NewProofOfWork(block)
+	block.Nonce, block.Hash = pow.Mine()
 
 	return block
 }
 
-// NewGenesisBlock crea e restituisce un GenesisBlock
+// Restituisce un GenesisBlock
 func NewGenesisBlock() *Block {
 	return NewBlock("Genesis Block", []byte{})
 }

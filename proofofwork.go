@@ -3,82 +3,86 @@ package main
 import (
 	"bytes"
 	"crypto/sha256"
+	"encoding/binary"
 	"fmt"
 	"math"
-	"math/big"
 )
 
-var (
-	maxNonce = math.MaxInt64
-)
+// Numero di bit più significativi che l'hash deve avere a 0
+const difficultyBits = 10
 
-const targetBits = 10
+var maxNonce = math.MaxInt64
 
-// ProofOfWork rappresenta il pow di un blocco
+// Rappresenta il PoW di un blocco
 type ProofOfWork struct {
-	block  *Block
-	target *big.Int
+	block  *Block   // Blocco a cui appartiene il PoW
+	target [32]byte // target, e quindi difficoltà, con il quale il PoW è stato calcolato
 }
 
-// NewProofOfWork costruisce e restituisce un ProofOfWork
+// Restituisce il PoW per un dato Blocco
 func NewProofOfWork(b *Block) *ProofOfWork {
-	target := big.NewInt(1)
-	target.Lsh(target, uint(256-targetBits))
+	var target [32]byte
 
-	pow := &ProofOfWork{b, target}
+	byteIdx := difficultyBits / 8
+	bitIdx := uint(difficultyBits % 8)
 
-	return pow
+	// Settiamo i primi difficultyBits a 0 e i successivi a 1
+	target[byteIdx] = byte((1 << (8 - bitIdx)) - 1)
+
+	// Tutti i bit successivi devono essere a 1 (byte a 255)
+	for i := byteIdx + 1; i < 32; i++ {
+		target[i] = 255
+	}
+
+	return &ProofOfWork{b, target}
 }
 
-func (pow *ProofOfWork) prepareData(nonce int) []byte {
-	data := bytes.Join(
-		[][]byte{
-			pow.block.PrevBlockHash,
-			pow.block.Data,
-			IntToHex(pow.block.Timestamp),
-			IntToHex(int64(targetBits)),
-			IntToHex(int64(nonce)),
-		},
-		[]byte{},
-	)
+// Dato il contenuto di un blocco e il nonce restituisce un unico []byte
+func (pow *ProofOfWork) prepareData(buf *bytes.Buffer, nonce int) []byte {
+	buf.Reset()
 
-	return data
+	buf.Write(pow.block.PrevBlockHash)
+	buf.Write(pow.block.Data)
+
+	//binary.Write scrive nel buffer degli int64 come bytes
+	binary.Write(buf, binary.BigEndian, pow.block.Timestamp)
+	binary.Write(buf, binary.BigEndian, int64(difficultyBits))
+	binary.Write(buf, binary.BigEndian, int64(nonce))
+
+	return buf.Bytes()
 }
 
-// Esegue un proof-of-work
-func (pow *ProofOfWork) Run() (int, []byte) {
-	var hashInt big.Int
+// Mining di un blocco
+func (pow *ProofOfWork) Mine() (int, []byte) {
 	var hash [32]byte
+	var buf bytes.Buffer
+	// buf.Grow() //potrei preallocare la memoria ma ancora non so quanta memoria occuperanno le transazioni
 	nonce := 0
 
 	fmt.Printf("Mining the block containing \"%s\"\n", pow.block.Data)
 	for nonce < maxNonce {
-		data := pow.prepareData(nonce)
+		data := pow.prepareData(&buf, nonce)
 
 		hash = sha256.Sum256(data)
-		fmt.Printf("\r%x", hash)
-		hashInt.SetBytes(hash[:])
-
-		if hashInt.Cmp(pow.target) == -1 {
+		if bytes.Compare(hash[:], pow.target[:]) == -1 {
 			break
 		} else {
 			nonce++
 		}
 	}
-	fmt.Print("\n\n")
+	fmt.Printf("\r%x\n\n", hash)
 
 	return nonce, hash[:]
 }
 
-// Valida il pow di un blocco
+// Verifica la validità di un blocco
 func (pow *ProofOfWork) Validate() bool {
-	var hashInt big.Int
+	var buf bytes.Buffer
 
-	data := pow.prepareData(pow.block.Nonce)
+	data := pow.prepareData(&buf, pow.block.Nonce)
 	hash := sha256.Sum256(data)
-	hashInt.SetBytes(hash[:])
 
-	isValid := hashInt.Cmp(pow.target) == -1
+	isValid := bytes.Compare(hash[:], pow.target[:]) == -1
 
 	return isValid
 }
