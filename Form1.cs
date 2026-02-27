@@ -2,7 +2,9 @@ using System;
 using System.Drawing;
 using System.Windows.Forms;
 using System.Collections.Generic;
-using Blockchain.Core; // Namespace dedicato alla logica di business
+using Blockchain.Core; 
+
+
 
 namespace Blockchain
 {
@@ -26,12 +28,17 @@ namespace Blockchain
 
             // Sottoscrizione all'evento della logica per aggiornamenti in tempo reale
             _blockchainManager.BlockAdded += BlockchainManager_BlockAdded;
+
+            
         }
 
         // 3. Metodi Handler: rispettano la firma (object sender, EventArgs e)
         private void BtnVisualizzaBlockchain_Click(object? sender, EventArgs e)
         {
             EntraInModalitaDettaglio("BLOCKCHAIN");
+            // Simuliamo la ricezione di un blocco da Go per dimostrare l'integrazione
+            SimulaRicezioneDaGo();
+           
         }
 
         private void BtnAggiungiWallet_Click(object? sender, EventArgs e)
@@ -161,6 +168,17 @@ namespace Blockchain
             card.Controls.Add(lblStatus);
 
             return card;
-        }       
+        }    
+        private void SimulaRicezioneDaGo()
+{
+    // Stringa JSON che rispetta la struttura della classe Block (Type Safety)
+    string jsonFinto = "{\"Index\": 1, \"Timestamp\": 1715673600, \"Data\": \"Transazione simulata da Go\", \"PreviousHash\": \"GENESIS_HASH\", \"Hash\": \"ABC123_HASH_RICEVUTO\"}";
+
+    // Chiamata al metodo che gestisce la logica (Orientamento ai componenti)
+    _blockchainManager.RiceviBloccoDaGo(jsonFinto);
+
+    // Aggiornamento della grafica dopo la ricezione
+    CaricaBlocchiGrafici();
+}   
     }
 }
