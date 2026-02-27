@@ -30,15 +30,16 @@ namespace Blockchain.Core
             { 
                 Index = 0, 
                 Timestamp = DateTimeOffset.UtcNow.ToUnixTimeSeconds(), 
-                Data = "Genesis Block", 
+                Data = "Genesis", 
                 PreviousHash = "0", 
-                Hash = "GENESIS_HASH"
+                Hash = "GENESIS_HASH",
+                Nonce = 0
             };
             _chain.Add(genesis);
         }
 
         // Metodo per aggiungere blocchi locali
-        public void AddBlock(string data)
+        public void AddBlock(string data, string hash, int nonce)
         {
             try 
             {
@@ -49,7 +50,8 @@ namespace Blockchain.Core
                     Timestamp = DateTimeOffset.UtcNow.ToUnixTimeSeconds(),
                     Data = data,
                     PreviousHash = lastBlock.Hash,
-                    Hash = "NEW_HASH_XYZ" 
+                    Hash = hash,
+                    Nonce = nonce
                 };
 
                 _chain.Add(newBlock);

@@ -99,7 +99,9 @@ namespace Blockchain
                 // Creiamo l'istanza grafica basandoci sui metadati dell'oggetto blocco
                 Panel bloccoGrafico = CreaSingoloBlocco(
                     bloccoDati.Index.ToString(), 
-                    bloccoDati.Hash, 
+                    bloccoDati.Data,
+                    bloccoDati.Hash,
+                    bloccoDati.Nonce.ToString(),
                     true
                 );
                 
@@ -124,11 +126,11 @@ namespace Blockchain
             }
         }
 
-        private Panel CreaSingoloBlocco(string id, string hash, bool isValid)
+        private Panel CreaSingoloBlocco(string id, string data, string hash,string nonce, bool isValid)
         {
             Panel card = new Panel
             {
-                Size = new Size(210, 200),
+                Size = new Size(220, 260),
                 BackColor = Color.White,
                 BorderStyle = BorderStyle.FixedSingle
             };
@@ -143,6 +145,17 @@ namespace Blockchain
                 TextAlign = ContentAlignment.MiddleCenter,
                 Font = new Font("Segoe UI", 10, FontStyle.Bold)
             };
+            Label lblData = new Label
+            {
+                Text = "Data: " + data,
+                BackColor = Color.FromArgb(45, 45, 45),
+                ForeColor = Color.White,
+                Location = new Point(10, 100), // Posizione Y
+                Size = new Size(200, 60),
+                TextAlign = ContentAlignment.TopCenter,
+                Font = new Font("Segoe UI", 9),
+                AutoSize = false //
+            };
 
             Label lblHash = new Label
             {
@@ -150,7 +163,17 @@ namespace Blockchain
                 BackColor = Color.FromArgb(45, 45, 45),
                 ForeColor = Color.White,
                 Location = new Point(10, 60),
-                Size = new Size(190, 25),
+                Size = new Size(200, 25),
+                TextAlign = ContentAlignment.MiddleCenter
+            };
+
+            Label lblNonce = new Label
+            {
+                Text = "Nonce:" + nonce,
+                BackColor = Color.FromArgb(45, 45, 45),
+                ForeColor = Color.White,
+                Location = new Point(10, 170),
+                Size = new Size(200, 25),
                 TextAlign = ContentAlignment.MiddleCenter
             };
 
@@ -163,8 +186,11 @@ namespace Blockchain
                 Height = 30
             };
 
-            card.Controls.Add(lblHash);
+           
             card.Controls.Add(lblHeader);
+            card.Controls.Add(lblData);
+            card.Controls.Add(lblHash);
+            card.Controls.Add(lblNonce);
             card.Controls.Add(lblStatus);
 
             return card;
@@ -172,7 +198,7 @@ namespace Blockchain
         private void SimulaRicezioneDaGo()
 {
     // Stringa JSON che rispetta la struttura della classe Block (Type Safety)
-    string jsonFinto = "{\"Index\": 1, \"Timestamp\": 1715673600, \"Data\": \"Transazione simulata da Go\", \"PreviousHash\": \"GENESIS_HASH\", \"Hash\": \"ABC123_HASH_RICEVUTO\"}";
+    string jsonFinto = "{\"Index\": 1, \"Timestamp\": 1715673600, \"Data\": \"Marta invia 100€ a Luca\", \"PreviousHash\": \"GENESIS_HASH\", \"Hash\": \"ABC123_HASH_RICEVUTO\", \"Nonce\": 456}";
 
     // Chiamata al metodo che gestisce la logica (Orientamento ai componenti)
     _blockchainManager.RiceviBloccoDaGo(jsonFinto);

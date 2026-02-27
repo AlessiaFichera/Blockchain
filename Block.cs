@@ -12,12 +12,13 @@ namespace Blockchain.Core
         public required string Data { get; init; }
         public required string PreviousHash { get; init; }
         public required string Hash { get; init; }
+        public required int Nonce { get; init; }
 
         // Metodo per visualizzare le informazioni (Override di Object.ToString)
         public override string ToString()
         {
             
-            return $"Blocco #{Index} [Hash: {Hash.Substring(0, 8)}...]";
+            return $"Blocco #{Index}  [Hash: {Hash.Substring(0, 8)}...]";
         }
     }
 }
