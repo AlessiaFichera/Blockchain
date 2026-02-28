@@ -1,9 +1,7 @@
 package main
 
 import (
-	"bytes"
 	"crypto/sha256"
-	"encoding/gob"
 	"encoding/hex"
 	"strconv"
 	"strings"
@@ -47,22 +45,6 @@ func (b *Block) HashTransactions() []byte {
 	}
 
 	return hasher.Sum(nil)
-}
-
-// Serializza un blocco per salvarlo nel DB. Errore se b è nil
-func (b *Block) Serialize() ([]byte, error) {
-	var result bytes.Buffer
-	encoder := gob.NewEncoder(&result)
-	err := encoder.Encode(b)
-	return result.Bytes(), err
-}
-
-// Deserializza un blocco letto dal DB
-func DeserializeBlock(d []byte) (*Block, error) {
-	var block Block
-	decoder := gob.NewDecoder(bytes.NewReader(d))
-	err := decoder.Decode(&block)
-	return &block, err
 }
 
 // Restituisce il contenuto di un blocco sotto forma di stringa

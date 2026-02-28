@@ -12,12 +12,7 @@ func (bc *Blockchain) Iterator() *BlockchainIterator {
 
 // Dato un blocco restituisce il precedente nella catena
 func (i *BlockchainIterator) Next() (*Block, error) {
-	blockBytes, err := i.storage.GetBlock(i.currentHash)
-	if err != nil {
-		return nil, err
-	}
-
-	block, err := DeserializeBlock(blockBytes)
+	block, err := i.storage.GetBlock(i.currentHash)
 	if err != nil {
 		return nil, err
 	}

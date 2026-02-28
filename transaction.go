@@ -63,6 +63,11 @@ func (tx *Transaction) Hash() ([]byte, error) {
 	return hash[:], nil
 }
 
+// Controlla se la transazione è una coinbase
+func (tx Transaction) IsCoinbase() bool {
+	return len(tx.Vin) == 1 && len(tx.Vin[0].Txid) == 0 && tx.Vin[0].Vout == -1
+}
+
 // Serializza la transazione. Errore se tx è nil
 func (tx *Transaction) serialize() ([]byte, error) {
 	var result bytes.Buffer

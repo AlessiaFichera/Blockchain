@@ -15,7 +15,7 @@ type Blockchain struct {
 // Crea un blocco con i dati in input e lo aggiunge alla catena
 func (bc *Blockchain) AddBlock(transactions []*Transaction) error {
 	newBlock := NewBlock(transactions, bc.tip)
-	if err := memorizeBlock(newBlock, bc.storage); err != nil {
+	if err := bc.storage.SaveBlock(newBlock.Hash, newBlock); err != nil {
 		return err
 	}
 	bc.tip = newBlock.Hash
@@ -35,7 +35,8 @@ func NewBlockchain(address string, s Storage) (*Blockchain, error) {
 		fmt.Println("Nessuna blockchain trovata. Generazione Genesis Block ...")
 		cbtx := NewCoinbaseTX(address, genesisBlockData)
 		genesis := NewGenesisBlock(cbtx)
-		if err := memorizeBlock(genesis, s); err != nil {
+
+		if err := s.SaveBlock(genesis.Hash, genesis); err != nil {
 			return nil, err
 		}
 		bc.tip = genesis.Hash
@@ -46,15 +47,6 @@ func NewBlockchain(address string, s Storage) (*Blockchain, error) {
 	}
 
 	return bc, nil
-}
-
-// Dato un blocco lo memorizza nel DB. Errore se il blocco è nil
-func memorizeBlock(b *Block, s Storage) error {
-	blockBytes, err := b.Serialize()
-	if err != nil {
-		return err
-	}
-	return s.SaveBlock(b.Hash, blockBytes)
 }
 
 // Stampa la blockchain

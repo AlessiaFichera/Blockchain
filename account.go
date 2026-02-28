@@ -68,6 +68,12 @@ func ValidateAddress(address string) bool {
 	return bytes.Equal(actualChecksum, checksum(content))
 }
 
+// Converte l'address leggibile in PubKeyHash
+func AddressToPubKeyHash(address string) []byte {
+	payload := base58.Decode(address)
+	return payload[versionLen : len(payload)-addressChecksumLen]
+}
+
 // Restituisce l'hash della chiave pubblica: RIPEMD160(SHA256(PubKey))
 func hashPubKey(pubKey []byte) []byte {
 	hashSHA256 := sha256.Sum256(pubKey)
