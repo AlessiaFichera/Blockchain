@@ -1,34 +1,43 @@
 package main
 
 import (
-	"log"
+	"fmt"
 )
 
 func main() {
 	storage, err := NewBoltStorage("blockchain.db")
 	if err != nil {
-		log.Panic(err)
+		fmt.Println("Errore creazione DB:", err)
 	}
 	defer storage.Close()
 
-	bc, err := NewBlockchain(storage)
+	fmt.Println("DB inizializzato con successo")
+
+	wallet, err := NewWallet()
 	if err != nil {
-		log.Panic(err)
+		fmt.Println("Errore creazione wallet:", err)
 	}
 
-	err = bc.AddBlock("Inviato 1 BTC a Mario")
+	account, err := wallet.AddAccount()
 	if err != nil {
-		log.Printf("Errore aggiunta blocco 1: %s", err)
+		fmt.Println("Errore creazione account:", err)
 	}
 
-	err = bc.AddBlock("Inviato 2 BTC a Giovanni")
+	fmt.Println("Account creato:", account)
+
+	bc, err := NewBlockchain(account, storage)
 	if err != nil {
-		log.Printf("Errore aggiunta blocco 2: %s", err)
+		fmt.Println("Errore nella creazione della blockchain:", err)
 	}
 
+	fmt.Println("Blockchain inizializzata con successo")
+
+	// transazioni
+
+	fmt.Println(" --- Stampa Blockchain ---")
 	err = bc.PrintBlockchain()
 	if err != nil {
-		log.Printf("Errore durante la stampa della catena: %v", err)
+		fmt.Println("Errore durante la stampa della catena:", err)
 	}
 
 }

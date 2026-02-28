@@ -4,6 +4,8 @@ import (
 	"fmt"
 )
 
+const genesisBlockData = "The Times 03/Jan/2009 Chancellor on brink of second bailout for banks"
+
 // Blockchain: sequenza di blocchi
 type Blockchain struct {
 	tip     []byte
@@ -11,8 +13,8 @@ type Blockchain struct {
 }
 
 // Crea un blocco con i dati in input e lo aggiunge alla catena
-func (bc *Blockchain) AddBlock(data string) error {
-	newBlock := NewBlock(data, bc.tip)
+func (bc *Blockchain) AddBlock(transactions []*Transaction) error {
+	newBlock := NewBlock(transactions, bc.tip)
 	if err := memorizeBlock(newBlock, bc.storage); err != nil {
 		return err
 	}
@@ -21,7 +23,7 @@ func (bc *Blockchain) AddBlock(data string) error {
 }
 
 // Crea una nuova blockchain con un Genesis block
-func NewBlockchain(s Storage) (*Blockchain, error) {
+func NewBlockchain(address string, s Storage) (*Blockchain, error) {
 	lastHash, err := s.GetLastHash()
 	if err != nil {
 		return nil, err
@@ -31,7 +33,8 @@ func NewBlockchain(s Storage) (*Blockchain, error) {
 
 	if len(lastHash) == 0 {
 		fmt.Println("Nessuna blockchain trovata. Generazione Genesis Block ...")
-		genesis := NewGenesisBlock()
+		cbtx := NewCoinbaseTX(address, genesisBlockData)
+		genesis := NewGenesisBlock(cbtx)
 		if err := memorizeBlock(genesis, s); err != nil {
 			return nil, err
 		}
@@ -45,7 +48,7 @@ func NewBlockchain(s Storage) (*Blockchain, error) {
 	return bc, nil
 }
 
-// Dato un blocco lo memorizza nel DB
+// Dato un blocco lo memorizza nel DB. Errore se il blocco è nil
 func memorizeBlock(b *Block, s Storage) error {
 	blockBytes, err := b.Serialize()
 	if err != nil {

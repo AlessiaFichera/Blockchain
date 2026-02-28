@@ -2,6 +2,7 @@ package main
 
 import (
 	"bytes"
+	"crypto/sha256"
 	"encoding/gob"
 	"encoding/hex"
 	"strconv"
@@ -12,17 +13,17 @@ import (
 // Rappresenta un blocco della catena
 type Block struct {
 	Timestamp     int64
-	Data          []byte
+	Transactions  []*Transaction
 	PrevBlockHash []byte
 	Hash          []byte
 	Nonce         int
 }
 
 // Restituisce un nuovo blocco
-func NewBlock(data string, prevBlockHash []byte) *Block {
+func NewBlock(transactions []*Transaction, prevBlockHash []byte) *Block {
 	block := &Block{
 		Timestamp:     time.Now().Unix(),
-		Data:          []byte(data),
+		Transactions:  transactions,
 		PrevBlockHash: prevBlockHash,
 	}
 
@@ -33,11 +34,22 @@ func NewBlock(data string, prevBlockHash []byte) *Block {
 }
 
 // Restituisce un GenesisBlock
-func NewGenesisBlock() *Block {
-	return NewBlock("Genesis Block", []byte{})
+func NewGenesisBlock(coinbase *Transaction) *Block {
+	return NewBlock([]*Transaction{coinbase}, []byte{})
 }
 
-// Serializza un blocco per salvarlo nel DB
+// Restituisce un hash identificatore delle transazioni in un blocco
+func (b *Block) HashTransactions() []byte {
+	hasher := sha256.New()
+
+	for _, tx := range b.Transactions {
+		hasher.Write(tx.ID)
+	}
+
+	return hasher.Sum(nil)
+}
+
+// Serializza un blocco per salvarlo nel DB. Errore se b è nil
 func (b *Block) Serialize() ([]byte, error) {
 	var result bytes.Buffer
 	encoder := gob.NewEncoder(&result)
@@ -63,28 +75,33 @@ func (b *Block) String() string {
 
 	// Timestamp
 	builder.WriteString("Timestamp:  ")
-	builder.WriteString(time.Unix(b.Timestamp, 0).Format(time.RFC822))
-	builder.WriteByte('\n')
-
-	// Dati
-	builder.WriteString("Dati:       ")
-	builder.Write(b.Data)
+	builder.WriteString(time.Unix(b.Timestamp, 0).Format("02/01/2006 15:04:05"))
 	builder.WriteByte('\n')
 
 	// Hash Precedente
-	builder.WriteString("Hash Prec:  ")
+	builder.WriteString("Hash Prec:             ")
 	builder.WriteString(hex.EncodeToString(b.PrevBlockHash))
 	builder.WriteByte('\n')
 
 	// Hash attuale
-	builder.WriteString("Hash:       ")
+	builder.WriteString("Hash:             ")
 	builder.WriteString(hex.EncodeToString(b.Hash))
 	builder.WriteByte('\n')
 
 	// Nonce
-	builder.WriteString("Nonce:      ")
+	builder.WriteString("Nonce:            ")
 	builder.WriteString(strconv.Itoa(b.Nonce))
 	builder.WriteByte('\n')
+
+	// Transazioni
+	builder.WriteString("Transactions:   ")
+	for i, tx := range b.Transactions {
+		builder.WriteString("  [")
+		builder.WriteString(strconv.Itoa(i))
+		builder.WriteString("] ")
+		builder.WriteString(hex.EncodeToString(tx.ID))
+		builder.WriteByte('\n')
+	}
 
 	return builder.String()
 }
