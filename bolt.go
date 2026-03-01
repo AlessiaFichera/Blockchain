@@ -102,9 +102,14 @@ func (s *BoltStorage) GetLastHash() ([]byte, error) {
 	return hash, err
 }
 
-// Restituisce gli UTXO di un PubKeyHash
-func (s *BoltStorage) GetUTXO(pubKeyHash []byte) ([]UTXO, error) {
+/*
+Restituisce gli UTXO di un PubKeyHash
+Se amount > 0, si ferma appena raggiunge la soglia.
+Se amount <= 0, restituisce tutti gli UTXO dell'indirizzo.
+*/
+func (s *BoltStorage) GetUTXO(pubKeyHash []byte, amount int) (int, []UTXO, error) {
 	var unspentOutputs []UTXO
+	accumulated := 0
 
 	err := s.db.View(func(tx *bbolt.Tx) error {
 		b := tx.Bucket(utxoBucket)
@@ -121,11 +126,17 @@ func (s *BoltStorage) GetUTXO(pubKeyHash []byte) ([]UTXO, error) {
 
 				utxo := UTXO{TxID: txID, Index: index, TXOutput: out}
 				unspentOutputs = append(unspentOutputs, utxo)
+
+				accumulated += out.Value
+
+				if amount > 0 && accumulated >= amount {
+					return nil
+				}
 			}
 		}
 		return nil
 	})
-	return unspentOutputs, err
+	return accumulated, unspentOutputs, err
 }
 
 // Aggiorna utxobucket dopo l'aggiunta di un nuovo blocco nella blockchain

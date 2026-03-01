@@ -1,6 +1,8 @@
 package main
 
 import (
+	"bytes"
+	"encoding/hex"
 	"fmt"
 )
 
@@ -65,5 +67,46 @@ func (bc *Blockchain) PrintBlockchain() error {
 			break
 		}
 	}
+	return nil
+}
+
+// Restituisce una transazione dato l'ID
+func (bc *Blockchain) FindTransaction(ID []byte) (Transaction, error) {
+	bci := bc.Iterator()
+
+	for {
+		block, err := bci.Next()
+		if err != nil {
+			return Transaction{}, err
+		}
+
+		for _, tx := range block.Transactions {
+			if bytes.Equal(tx.ID, ID) {
+				return *tx, nil
+			}
+		}
+
+		if len(block.PrevBlockHash) == 0 {
+			break
+		}
+	}
+
+	return Transaction{}, fmt.Errorf("Transaction not found")
+}
+
+// Firma la transazione in input. Verifica che tutte le TxInput siano presenti in blockchain
+func (bc *Blockchain) SignTransaction(account *Account, tx *Transaction) error {
+	prevTXs := make(map[string]Transaction)
+
+	for _, vin := range tx.Vin {
+		prevTX, err := bc.FindTransaction(vin.Txid)
+		if err != nil {
+			return err
+		}
+		prevTXs[hex.EncodeToString(prevTX.ID)] = prevTX
+	}
+
+	tx.Sign(account, prevTXs)
+
 	return nil
 }

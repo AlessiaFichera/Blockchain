@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"crypto/sha256"
 	"encoding/binary"
+	"encoding/hex"
 	"fmt"
 	"math"
 )
@@ -62,7 +63,7 @@ func (pow *ProofOfWork) Mine() (int, []byte) {
 	pow.prepareData(&buf)
 	nonce := 0
 
-	fmt.Printf("Mining ...")
+	fmt.Println("Mining ...")
 	for nonce < maxNonce {
 		buf.Truncate(buf.Len() - 8)
 		binary.Write(&buf, binary.BigEndian, int64(nonce))
@@ -74,7 +75,7 @@ func (pow *ProofOfWork) Mine() (int, []byte) {
 			nonce++
 		}
 	}
-	fmt.Printf("\r%x\n\n", hash)
+	fmt.Println("Hash del blocco minato: ", hex.EncodeToString(hash[:]))
 
 	return nonce, hash[:]
 }
