@@ -32,7 +32,7 @@ namespace Blockchain.Core
             { 
                 Index = 0, 
                 Timestamp = DateTimeOffset.UtcNow.ToUnixTimeSeconds(), 
-                Data = "Genesis", 
+                Transactions = new List<TransactionData>(), 
                 PreviousHash = "0", 
                 Hash = "GENESIS_HASH",
                 Nonce = 0
@@ -41,30 +41,38 @@ namespace Blockchain.Core
         }
 
         // Metodo per aggiungere blocchi locali
-        public void AddBlock(string data, string hash, int nonce)
+        public void AddBlock(List<TransactionData> transactions, string hash, int nonce)
+    {
+        try 
         {
-            try 
+            var lastBlock = _chain[_chain.Count - 1];
+            var newBlock = new Block
             {
-                var lastBlock = _chain[_chain.Count - 1];
-                var newBlock = new Block
-                {
-                    Index = lastBlock.Index + 1,
-                    Timestamp = DateTimeOffset.UtcNow.ToUnixTimeSeconds(),
-                    Data = data,
-                    PreviousHash = lastBlock.Hash,
-                    Hash = hash,
-                    Nonce = nonce
-                };
+                Index = lastBlock.Index + 1,
+                Timestamp = DateTimeOffset.UtcNow.ToUnixTimeSeconds(),
+                Transactions = transactions, // Ora accettiamo la lista di componenti transazione
+                PreviousHash = lastBlock.Hash,
+                Hash = hash,
+                Nonce = nonce
+            };
 
-                _chain.Add(newBlock);
-                OnBlockAdded(newBlock);
-            }
-            catch (Exception ex)
-            {
-                // Implementazione di software robusto tramite gestione errori
-                throw new InvalidOperationException("Errore durante la creazione del blocco", ex);
-            }
+            _chain.Add(newBlock);
+            OnBlockAdded(newBlock);
         }
+        catch (Exception ex)
+        {
+            // Gestione errori per un software durevole
+            throw new InvalidOperationException("Errore durante la creazione del blocco", ex);
+        }
+    }
+
+    protected virtual void OnBlockAdded(Block block)
+    {
+        BlockAdded?.Invoke(this, new BlockAddedEventArgs(block));
+    }
+
+    public IReadOnlyList<Block> Chain => _chain.AsReadOnly();
+
 
         // Nuovo metodo per integrare i dati provenienti da Go
         // In BlockchainManager.cs
@@ -98,8 +106,7 @@ public void RiceviBloccoDaGo(string jsonRicevuto)
         // 4. Software Robusto: Gestiamo l'errore a runtime senza interrompere l'esecuzione
         Console.WriteLine($"Errore nei metadati JSON ricevuti: {ex.Message}");
     }
-}
-// In BlockchainManager.cs
+    }
 public void EseguiAggiornamentoPython()
 {
     try
@@ -137,7 +144,7 @@ public List<Analitica> EstraiAnalitiche(string jsonRicevuto)
         }
         var d = root.statistiche;
 
-        // Creiamo una lista di componenti proprio come la catena dei blocchi
+        // Creiamo una lista di componenti 
         return new List<Analitica> 
         {
             new Analitica { Titolo = "Mining Medio", Valore = d.tempo_medio_mining.ToString("F2") + "s" },
@@ -146,7 +153,7 @@ public List<Analitica> EstraiAnalitiche(string jsonRicevuto)
             new Analitica { Titolo = "Valore Medio", Valore = "€" + d.valore_medio_euro.ToString("F2") }
         };
     }
-    catch (Exception) { return new List<Analitica>(); } // Software Robusto
+    catch (Exception) { return new List<Analitica>(); } 
 }
 public class StatisticaUI 
 { 
@@ -154,31 +161,75 @@ public class StatisticaUI
     public string Valore { get; set; } = ""; 
 }
 
-        protected virtual void OnBlockAdded(Block block)
+
+       public List<WalletAccount> EstraiListaWallet(string jsonRicevuto)
+{
+    try 
+    {
+        // 1. Type Safety: Opzioni per far corrispondere il JSON ai Metadata C#
+        var options = new JsonSerializerOptions { PropertyNameCaseInsensitive = true };
+        
+        // 2. Deserializzazione: Usiamo il tipo annullabile '?' come nelle slide
+        var root = JsonSerializer.Deserialize<WalletRoot>(jsonRicevuto, options);
+        
+        if (root == null || root.Accounts == null) 
         {
-            BlockAdded?.Invoke(this, new BlockAddedEventArgs(block));
+            return new List<WalletAccount>(); 
         }
 
-        public IReadOnlyList<Block> Chain => _chain.AsReadOnly();
+        // Creiamo la lista finale di WalletAccount, coerente con la tua classe
+        var listaWallet = new List<WalletAccount>();
 
-// In BlockchainManager.cs, aggiungi queste classi in fondo al file
-public class Analitica 
-{ 
-    public string Titolo { get; set; } = ""; 
-    public string Valore { get; set; } = ""; 
+        foreach (var acc in root.Accounts)
+        {
+            // Aggiungiamo l'oggetto WalletAccount con i dati da Go
+            listaWallet.Add(new WalletAccount 
+            { 
+                Address = acc.Address ?? "Indirizzo non trovato", 
+                Balance = acc.Balance 
+            });
+        }
+
+        return listaWallet;
+    }
+    catch (Exception ex) 
+    { 
+        // 3. Software Robusto: Gestione errori a runtime
+        Console.WriteLine($"Errore caricamento Wallet: {ex.Message}");
+        return new List<WalletAccount>(); 
+    } 
 }
-
-public class StatisticheRoot
+public List<TransactionData> EstraiListaTransazioni(string jsonRicevuto)
 {
-    public required DatiStatistici statistiche { get; set; }
-}
+    try 
+    {
+        var options = new JsonSerializerOptions { PropertyNameCaseInsensitive = true };
+        var root = JsonSerializer.Deserialize<TransactionRoot>(jsonRicevuto, options);
+        
+        if (root == null || root.Transactions == null) 
+        {
+            return new List<TransactionData>(); 
+        }
 
-public class DatiStatistici
-{
-    public double tempo_medio_mining { get; set; }
-    public int totale_transazioni { get; set; }
-    public int utxo_totale { get; set; }
-    public double valore_medio_euro { get; set; }
+        var listaTransazioni = new List<TransactionData>();
+
+        foreach (var tx in root.Transactions)
+        {
+            listaTransazioni.Add(new TransactionData 
+            { 
+                ID = tx.ID ?? "ID Sconosciuto",
+                Outputs = tx.Outputs ?? new List<TxOutputData>() 
+            });
+        }
+
+        return listaTransazioni;
+    }
+    catch (Exception ex) 
+    { 
+        // Catturiamo l'eccezione per non far chiudere il programma
+        Console.WriteLine($"Errore critico transazioni: {ex.Message}");
+        return new List<TransactionData>(); 
+    } 
 }
     
     }

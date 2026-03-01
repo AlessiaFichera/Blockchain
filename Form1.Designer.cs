@@ -94,8 +94,8 @@ partial class Form1
        
 
         // Stilizziamo i bottoni come "Card" per l'inizio
-        StilizzaBottone(btnAggiungiWallet, "Aggiungi Wallet", 150);
-        StilizzaBottone(btnInviaTransazione, "Invia Transazione", 220);
+        StilizzaBottone(btnAggiungiWallet, "Wallet Disponibili", 150);
+        StilizzaBottone(btnInviaTransazione, "Cronologia Transazioni", 220);
         StilizzaBottone(btnVisualizzaBlockchain, "Visualizza Blockchain", 290);
         StilizzaBottone(btnAnalitiche, "Analitiche", 360);
         

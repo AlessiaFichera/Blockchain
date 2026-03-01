@@ -89,13 +89,58 @@ private void BtnAnalitiche_Click(object? sender, EventArgs e)
         private void BtnAggiungiWallet_Click(object? sender, EventArgs e)
         {
             EntraInModalitaDettaglio("WALLET");
+            string nomeFile = "wallet.json";
+
+    if (File.Exists(nomeFile))
+    {
+        try 
+        {
+            // Leggiamo il file esterno
+            string contenutoJson = File.ReadAllText(nomeFile);
+            
+        
+
+            // Carichiamo i blocchi grafici (che ora iterano sulla catena aggiornata)
+            CaricaWalletGrafici(contenutoJson);
+        }
+        catch (Exception ex)
+        {
+            MessageBox.Show($"Errore di runtime: {ex.Message}");
+        }
+    }
+    else
+    {
+        MessageBox.Show("Il file wallet.json non è stato trovato.");
+    }
         }
 
         private void BtnInviaTransazione_Click(object? sender, EventArgs e)
         {
             EntraInModalitaDettaglio("TRANSAZIONE");
-        }
+             string nomeFile = "transazioni.json";
 
+    if (File.Exists(nomeFile))
+    {
+        try 
+        {
+            // Leggiamo il file esterno
+            string contenutoJson = File.ReadAllText(nomeFile);
+            
+        
+
+            // Carichiamo i blocchi grafici (che ora iterano sulla catena aggiornata)
+            CaricaTransazioniGrafiche(contenutoJson);
+        }
+        catch (Exception ex)
+        {
+            MessageBox.Show($"Errore di runtime: {ex.Message}");
+        }
+    }
+    else
+    {
+        MessageBox.Show("Il file wallet.json non è stato trovato.");
+    }
+        }
         private void BlockchainManager_BlockAdded(object? sender, BlockAddedEventArgs e)
         {
             // Notifica all'utente che un nuovo oggetto (blocco) è stato creato,testato + avanti
@@ -146,7 +191,7 @@ private void BtnAnalitiche_Click(object? sender, EventArgs e)
                 // Creiamo l'istanza grafica basandoci sui metadati dell'oggetto blocco
                 Panel bloccoGrafico = CreaSingoloBlocco(
                     bloccoDati.Index.ToString(), 
-                    bloccoDati.Data,
+                    bloccoDati.Transactions,
                     bloccoDati.Hash,
                     bloccoDati.Nonce.ToString(),
                     true
@@ -173,11 +218,11 @@ private void BtnAnalitiche_Click(object? sender, EventArgs e)
             }
         }
 
-        private Panel CreaSingoloBlocco(string id, string data, string hash,string nonce, bool isValid)
+        private Panel CreaSingoloBlocco(string id, List<TransactionData>? transactions, string hash,string nonce, bool isValid)
         {
             Panel card = new Panel
             {
-                Size = new Size(220, 260),
+                Size = new Size(220, 300),
                 BackColor = Color.White,
                 BorderStyle = BorderStyle.FixedSingle
             };
@@ -192,13 +237,27 @@ private void BtnAnalitiche_Click(object? sender, EventArgs e)
                 TextAlign = ContentAlignment.MiddleCenter,
                 Font = new Font("Segoe UI", 10, FontStyle.Bold)
             };
+            string elencoTransazioni = "";
+            if (transactions != null && transactions.Count > 0)
+    {
+        foreach (var tx in transactions)
+        {
+            // Prendiamo i primi 10 caratteri dell'ID per ogni transazione
+            string idBreve = (tx.ID?.Length > 10) ? tx.ID.Substring(0, 10) : tx.ID ?? "N/D";
+            elencoTransazioni += $"• TX: {idBreve}...\n";
+        }
+    }
+    else
+    {
+        elencoTransazioni = "Nessuna transazione";
+    }
             Label lblData = new Label
             {
-                Text = "Data: " + data,
+               Text = elencoTransazioni,
                 BackColor = Color.FromArgb(45, 45, 45),
                 ForeColor = Color.White,
                 Location = new Point(10, 100), // Posizione Y
-                Size = new Size(200, 60),
+                Size = new Size(200, 100),
                 TextAlign = ContentAlignment.TopCenter,
                 Font = new Font("Segoe UI", 9),
                 AutoSize = false //
@@ -219,7 +278,7 @@ private void BtnAnalitiche_Click(object? sender, EventArgs e)
                 Text = "Nonce:" + nonce,
                 BackColor = Color.FromArgb(45, 45, 45),
                 ForeColor = Color.White,
-                Location = new Point(10, 170),
+                Location = new Point(10, 200),
                 Size = new Size(200, 25),
                 TextAlign = ContentAlignment.MiddleCenter
             };
@@ -294,6 +353,91 @@ private void BtnAnalitiche_Click(object? sender, EventArgs e)
     {
         
         Console.WriteLine("Immagine del grafico non trovata.");
+    }
+}
+        private void CaricaWalletGrafici(string jsonContenuto)
+        {
+            pnlContainer.Controls.Clear();
+            pnlContainer.AutoScroll = true; 
+
+            int coordinataY = 20; 
+
+            var walletList = _blockchainManager.EstraiListaWallet(jsonContenuto);
+
+            foreach (var wallet in walletList)
+            {
+                Panel walletCard = new Panel
+                {
+                    Size = new Size(300, 80),
+                    BackColor = Color.White,
+                    BorderStyle = BorderStyle.FixedSingle,
+                    Location = new Point(20, coordinataY)
+                };
+
+                Label lblAddress = new Label
+                {
+                    Text = "Indirizzo: " + wallet.Address,
+                    ForeColor = Color.FromArgb(45, 45, 45),
+                    Location = new Point(10, 10),
+                    Size = new Size(280, 25),
+                    TextAlign = ContentAlignment.MiddleLeft,
+                    Font = new Font("Segoe UI", 9)
+                };
+
+                Label lblBalance = new Label
+                {
+                    Text = "Saldo: " + wallet.Balance.ToString("F2") + " BTC",
+                    ForeColor = Color.FromArgb(45, 45, 45),
+                    Location = new Point(10, 40),
+                    Size = new Size(280, 25),
+                    TextAlign = ContentAlignment.MiddleLeft,
+                    Font = new Font("Segoe UI", 9)
+                };
+
+                walletCard.Controls.Add(lblAddress);
+                walletCard.Controls.Add(lblBalance);
+                pnlContainer.Controls.Add(walletCard);
+
+                coordinataY += 100; 
+            }
+        }
+        private void CaricaTransazioniGrafiche(string jsonContenuto)
+{
+    pnlContainer.Controls.Clear();
+    var listaTx = _blockchainManager.EstraiListaTransazioni(jsonContenuto);
+    int coordinataY = 20;
+
+    foreach (var tx in listaTx)
+    {
+        Panel txCard = new Panel
+        {
+            Size = new Size(400, 90),
+            BackColor = Color.FromArgb(245, 245, 245),
+            BorderStyle = BorderStyle.FixedSingle,
+            Location = new Point(20, coordinataY)
+        };
+
+        Label lblId = new Label
+        {
+            Text = "🆔 TX: " + (tx.ID?.Substring(0, 15) ?? "N/D") + "...",
+            Font = new Font("Consolas", 9, FontStyle.Bold),
+            Location = new Point(10, 10),
+            Size = new Size(380, 20)
+        };
+
+        // Mostriamo il primo output come esempio di destinazione
+        var primoOut = tx.Outputs?[0];
+        Label lblDettaglio = new Label
+        {
+            Text = $"Inviati {primoOut?.Value} BTC a {primoOut?.PubKeyHash?.Substring(0, 10)}...",
+            Location = new Point(10, 40),
+            Size = new Size(380, 40)
+        };
+
+        txCard.Controls.Add(lblId);
+        txCard.Controls.Add(lblDettaglio);
+        pnlContainer.Controls.Add(txCard);
+        coordinataY += 100;
     }
 }
        

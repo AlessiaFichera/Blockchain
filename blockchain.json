@@ -1,60 +1,58 @@
 [
-    
-    {
-        "Index": 1,
-        "Timestamp": 1715673600,
-        "Data": "Marta invia 100€ a Luca",
-        "PreviousHash": "HASH_GENESIS",
-        "Hash": "ABC123_HASH_1",
-        "Nonce": 456
-    },
-    {
-        "Index": 2,
-        "Timestamp": 1715674200,
-        "Data": "Alessia invia 250€ a Marco",
-        "PreviousHash": "ABC123_HASH_1",
-        "Hash": "DEF456_HASH_2",
-        "Nonce": 789
-    },
-    {
-        "Index": 3,
-        "Timestamp": 1715674850,
-        "Data": "Giulia invia 50€ a Marta",
-        "PreviousHash": "DEF456_HASH_2",
-        "Hash": "GHI789_HASH_3",
-        "Nonce": 101
-    },
-    {
-        "Index": 4,
-        "Timestamp": 1715675500,
-        "Data": "Luca invia 120€ a Alessia",
-        "PreviousHash": "GHI789_HASH_3",
-        "Hash": "LMN012_HASH_4",
-        "Nonce": 202
-    },
-    {
-        "Index": 5,
-        "Timestamp": 1715676000,
-        "Data": "Marco invia 80€ a Giulia",
-        "PreviousHash": "LMN012_HASH_4",
-        "Hash": "OPQ345_HASH_5",
-        "Nonce": 303
-    },
-    {
-        "Index": 6,
-        "Timestamp": 1715676500,
-        "Data": "Giulia invia 180€ a Marco",
-        "PreviousHash": "OPQ345_HASH_5",
-        "Hash": "RST678_HASH_6",
-        "Nonce": 404
-    },
-        {
-        "Index": 7,
-        "Timestamp": 1715677000,
-        "Data": "Marco invia 50€ a Giulia",
-        "PreviousHash": "RST678_HASH_6",
-        "Hash": "UVW901_HASH_7",
-        "Nonce": 505
-    }
-
+ 
+  {
+    "Index": 1,
+    "Timestamp": 1704106000,
+    "Transactions": [
+      {
+        "ID": "TX_HASH_AAABBB111",
+        "Outputs": [{ "Value": 10.5, "PubKeyHash": "ADDR_A" }]
+      },
+      {
+        "ID": "TX_HASH_CCCDDD222",
+        "Outputs": [{ "Value": 5.0, "PubKeyHash": "ADDR_B" }]
+      }
+    ],
+    "PreviousHash": "0000000abc123456789",
+    "Hash": "0000000def987654321",
+    "Nonce": 2048
+  },
+  {
+    "Index": 2,
+    "Timestamp": 1704106500,
+    "Transactions": [
+      {
+        "ID": "TX_FAST_PAYMENT_999",
+        "Outputs": [{ "Value": 0.1, "PubKeyHash": "ADDR_D" }]
+      }
+    ],
+    "PreviousHash": "0000000def987654321",
+    "Hash": "0000000ghi456789123",
+    "Nonce": 3072
+  },
+  {
+    "Index": 3,
+    "Timestamp": 1704107000,
+    "Transactions": [
+      {
+        "ID": "TX_MULTI_PAY_01",
+        "Outputs": [{ "Value": 1.0, "PubKeyHash": "ADDR_E" }]
+      },
+      {
+        "ID": "TX_MULTI_PAY_02",
+        "Outputs": [{ "Value": 2.0, "PubKeyHash": "ADDR_F" }]
+      },
+      {
+        "ID": "TX_MULTI_PAY_03",
+        "Outputs": [{ "Value": 3.0, "PubKeyHash": "ADDR_G" }]
+      },
+      {
+        "ID": "TX_MULTI_PAY_04",
+        "Outputs": [{ "Value": 4.0, "PubKeyHash": "ADDR_H" }]
+      }
+    ],
+    "PreviousHash": "0000000ghi456789123",
+    "Hash": "0000000jkl012345678",
+    "Nonce": 4096
+  }
 ]

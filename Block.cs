@@ -1,24 +1,25 @@
 using System;
+using System.Collections.Generic;
 
 namespace Blockchain.Core
 {
-    // Usiamo una classe (Reference Type) 
     public class Block
     {
-        // Proprietà richieste per un blocco
-        
         public required int Index { get; init; }
         public required long Timestamp { get; init; }
-        public required string Data { get; init; }
+        
+        // MODIFICA: Da string a List per gestire i dati reali di Go
+        public List<TransactionData>? Transactions { get; init; }
+
         public required string PreviousHash { get; init; }
         public required string Hash { get; init; }
         public required int Nonce { get; init; }
 
-        // Metodo per visualizzare le informazioni (Override di Object.ToString)
+        // Metodo ToString aggiornato per gestire stringhe corte (Software Robusto)
         public override string ToString()
         {
-            
-            return $"Blocco #{Index}  [Hash: {Hash.Substring(0, 8)}...]";
+            string hashBreve = (Hash.Length > 8) ? Hash.Substring(0, 8) : Hash;
+            return $"Blocco #{Index} [Hash: {hashBreve}...] - TX: {Transactions?.Count ?? 0}";
         }
     }
 }

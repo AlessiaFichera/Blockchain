@@ -25,36 +25,35 @@ class BlockchainStats:
     def totale_transazioni_rete(self):
         conteggio = 0
         for blocco in self.data:
-            testo = blocco.get('Data', "") 
-            
-            if "invia" in testo.lower(): # Controlliamo se la parola "invia" è presente nel testo, ignorando maiuscole/minuscole
-                conteggio += 1
+            lista_transazioni = blocco.get('Transactions', [])
+            conteggio += len(lista_transazioni)
         return conteggio
 
     def analizza_frammentazione_utxo(self):
         tutti_utxo = []
         for blocco in self.data:
-            # Usiamo .get() 
-            testo = blocco.get('Data', "")
+            lista_tx = blocco.get('Transactions', [])
             
-            # Dividiamo la frase in parole
-            parole = testo.split()
-            
-            for parola in parole:
-                solo_numeri = ""
-                for carattere in parola:
-                    if carattere.isdigit() or carattere == "." or carattere == ",":
-                        solo_numeri += carattere
-                
-            
-                if solo_numeri != "":
-                    try:
-                        valore = float(solo_numeri.replace(",", "."))
-                        # Escludiamo lo zero (come il blocco Genesis o l'indice)
-                        if valore > 0: 
-                            tutti_utxo.append(valore)
-                    except ValueError:
-                        continue
+            for tx in lista_tx:
+                outputs = tx.get('Outputs', [])
+                for out in outputs:
+                    # 1. Prendiamo il valore e trasformiamolo in stringa per poterlo controllare carattere per carattere
+                    valore_raw = str(out.get('Value', "0"))
+                    
+                    solo_numeri = ""
+                    # 2. Controllo isdigit carattere per carattere (come prima!)
+                    for carattere in valore_raw:
+                        if carattere.isdigit() or carattere == "." or carattere == ",":
+                            solo_numeri += carattere
+                    
+                    # 3. Conversione robusta con gestione errore
+                    if solo_numeri != "":
+                        try:
+                            valore_finale = float(solo_numeri.replace(",", "."))
+                            if valore_finale > 0:
+                                tutti_utxo.append(valore_finale)
+                        except ValueError:
+                            continue
         
         if not tutti_utxo:
             print("Nessun valore numerico trovato.")
@@ -65,8 +64,8 @@ class BlockchainStats:
         # Grafico
         plt.figure(figsize=(10, 6))
         plt.hist(tutti_utxo, bins=8, color='royalblue', edgecolor='white', alpha=0.8)
-        plt.title("Analisi Valori Transazioni Blockchain", fontsize=14, fontweight='bold')
-        plt.xlabel("Importo in Euro (€)", fontsize=12)
+        plt.title("Analisi Valori Transazioni Blockchain(UTXO)", fontsize=14, fontweight='bold')
+        plt.xlabel("Importo in BTC (€)", fontsize=12)
         plt.ylabel("Frequenza (Numero di Blocchi)", fontsize=12)
         plt.grid(axis='y', linestyle='--', alpha=0.6)
         plt.savefig("grafico_blockchain.png") 
