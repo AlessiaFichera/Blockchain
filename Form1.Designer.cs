@@ -11,6 +11,9 @@ partial class Form1
     private Button btnAggiungiWallet;
     private Button btnInviaTransazione;
     private Button btnVisualizzaBlockchain; 
+    private Button btnAnalitiche;
+
+    private PictureBox picGrafico;
 
 
      private System.ComponentModel.IContainer components = null;
@@ -43,13 +46,21 @@ partial class Form1
         btnAggiungiWallet = new Button();
         btnInviaTransazione = new Button();
         btnVisualizzaBlockchain = new Button();
-
+        btnAnalitiche = new Button();
         // 
         // Form1
         // 
         this.ClientSize = new Size(1000, 600); // Più grande per ospitare la catena
         this.BackColor = Color.FromArgb(24, 28, 36); // Colore scuro dell'immagine
         this.Text = "BlockchainHome";
+
+        //Grafico
+        this.picGrafico = new PictureBox();
+        this.picGrafico.Size = new Size(600, 400); // Dimensione adatta al grafico
+        this.picGrafico.Location = new Point(20, 200); // Posizionalo sotto le card delle statistiche
+        this.picGrafico.SizeMode = PictureBoxSizeMode.Zoom; // Mantiene le proporzioni (Software Robusto)
+        this.picGrafico.Visible = false;
+        this.pnlContainer.Controls.Add(this.picGrafico);
 
         // 
         // pnlDettaglio (Il menù a tendina laterale)
@@ -86,6 +97,7 @@ partial class Form1
         StilizzaBottone(btnAggiungiWallet, "Aggiungi Wallet", 150);
         StilizzaBottone(btnInviaTransazione, "Invia Transazione", 220);
         StilizzaBottone(btnVisualizzaBlockchain, "Visualizza Blockchain", 290);
+        StilizzaBottone(btnAnalitiche, "Analitiche", 360);
         
     
         // I bottoni delle azioni li aggiungiamo inizialmente al form centrale
@@ -96,6 +108,7 @@ partial class Form1
         pnlContainer.Controls.Add(btnAggiungiWallet);
         pnlContainer.Controls.Add(btnInviaTransazione);
         pnlContainer.Controls.Add(btnVisualizzaBlockchain);
+        pnlContainer.Controls.Add(btnAnalitiche);
     }
 
     private void StilizzaBottone(Button btn, string testo, int y)
@@ -110,6 +123,7 @@ partial class Form1
         btn.Font = new Font("Segoe UI", 11, FontStyle.Bold);
         btn.Cursor = Cursors.Hand;
     }
+    
 
     #endregion
 }

@@ -3,7 +3,8 @@ using System.Drawing;
 using System.Windows.Forms;
 using System.Collections.Generic;
 using Blockchain.Core; 
-
+using System.IO;
+using System.Text.Json; 
 
 
 namespace Blockchain
@@ -25,6 +26,7 @@ namespace Blockchain
             btnVisualizzaBlockchain.Click += BtnVisualizzaBlockchain_Click;
             btnAggiungiWallet.Click += BtnAggiungiWallet_Click;
             btnInviaTransazione.Click += BtnInviaTransazione_Click;
+            btnAnalitiche.Click += BtnAnalitiche_Click;
 
             // Sottoscrizione all'evento della logica per aggiornamenti in tempo reale
             _blockchainManager.BlockAdded += BlockchainManager_BlockAdded;
@@ -36,10 +38,53 @@ namespace Blockchain
         private void BtnVisualizzaBlockchain_Click(object? sender, EventArgs e)
         {
             EntraInModalitaDettaglio("BLOCKCHAIN");
-            // Simuliamo la ricezione di un blocco da Go per dimostrare l'integrazione
-            SimulaRicezioneDaGo();
-           
+            string nomeFile = "blockchain.json";
+
+    if (File.Exists(nomeFile))
+    {
+        try 
+        {
+            // Leggiamo il file esterno
+            string contenutoJson = File.ReadAllText(nomeFile);
+            
+            // Passiamo i dati alla logica aggiornata
+            _blockchainManager.RiceviBloccoDaGo(contenutoJson);
+
+            // Carichiamo i blocchi grafici (che ora iterano sulla catena aggiornata)
+            CaricaBlocchiGrafici();
         }
+        catch (Exception ex)
+        {
+            MessageBox.Show($"Errore di runtime: {ex.Message}");
+        }
+    }
+    else
+    {
+        MessageBox.Show("Il file blockchain.json non è stato trovato.");
+    }
+}
+private void BtnAnalitiche_Click(object? sender, EventArgs e)
+{
+    _blockchainManager.EseguiAggiornamentoPython();
+
+    string nomeFile = "analitiche.json"; 
+
+    if (File.Exists(nomeFile))
+    {
+        // Leggiamo tutto il testo del file JSON
+        string contenutoJson = File.ReadAllText(nomeFile);
+        
+        // Entriamo nella modalità grafica
+        EntraInModalitaDettaglio("ANALITICHE");
+        
+        // Chiamiamo la funzione di stampa passandogli i dati veri
+        VisualizzaStatistiche(contenutoJson);
+    }
+    else
+    {
+        MessageBox.Show("File analitiche.json non trovato!");
+    }
+}
 
         private void BtnAggiungiWallet_Click(object? sender, EventArgs e)
         {
@@ -63,10 +108,12 @@ namespace Blockchain
     btnAggiungiWallet.Dock = DockStyle.Top;
     btnInviaTransazione.Dock = DockStyle.Top;
     btnVisualizzaBlockchain.Dock = DockStyle.Top;
+    btnAnalitiche.Dock = DockStyle.Top;
 
     pnlDettaglio.Controls.Add(btnAggiungiWallet);
     pnlDettaglio.Controls.Add(btnInviaTransazione);
     pnlDettaglio.Controls.Add(btnVisualizzaBlockchain);
+    pnlDettaglio.Controls.Add(btnAnalitiche);
 
     
     pnlDettaglio.Visible = true;
@@ -194,17 +241,61 @@ namespace Blockchain
             card.Controls.Add(lblStatus);
 
             return card;
-        }    
-        private void SimulaRicezioneDaGo()
+        }  
+        private void VisualizzaStatistiche(string jsonContenuto)
 {
-    // Stringa JSON che rispetta la struttura della classe Block (Type Safety)
-    string jsonFinto = "{\"Index\": 1, \"Timestamp\": 1715673600, \"Data\": \"Marta invia 100€ a Luca\", \"PreviousHash\": \"GENESIS_HASH\", \"Hash\": \"ABC123_HASH_RICEVUTO\", \"Nonce\": 456}";
+    pnlContainer.Controls.Clear();
+    var stats = _blockchainManager.EstraiAnalitiche(jsonContenuto);
+    int coordinataX = 20;
+    pnlContainer.AutoScroll = true; 
 
-    // Chiamata al metodo che gestisce la logica (Orientamento ai componenti)
-    _blockchainManager.RiceviBloccoDaGo(jsonFinto);
+    // Disegno delle Card (Componenti)
+    foreach (var s in stats)
+    {
+        Panel card = new Panel
+        {
+            Size = new Size(170, 100),
+            Location = new Point(coordinataX, 50),
+            BackColor = Color.White,
+            BorderStyle = BorderStyle.FixedSingle
+        };
 
-    // Aggiornamento della grafica dopo la ricezione
-    CaricaBlocchiGrafici();
-}   
+        Label lbl = new Label
+        {
+            Text = $"{s.Titolo}\n{s.Valore}",
+            Dock = DockStyle.Fill,
+            TextAlign = ContentAlignment.MiddleCenter,
+            Font = new Font("Segoe UI", 10, FontStyle.Bold)
+        };
+
+        card.Controls.Add(lbl);
+        pnlContainer.Controls.Add(card);
+        coordinataX += 190;
+    }
+
+    string percorsoImmagine = "grafico_blockchain.png";
+
+    // Verifica se il file esiste per garantire un software robusto (previene crash a runtime)
+    if (File.Exists(percorsoImmagine))
+    {
+        PictureBox pic = new PictureBox
+        {
+            // Carica l'immagine dal file generato da Python
+            Image = Image.FromFile(percorsoImmagine),
+            Location = new Point(20, 180), // Posizionato sotto le card
+            Size = new Size(700, 350),     // Dimensione grande per il grafico
+            SizeMode = PictureBoxSizeMode.Zoom, // Adatta l'immagine senza sgranare
+            BorderStyle = BorderStyle.None
+        };
+        
+        pnlContainer.Controls.Add(pic);
+    }
+    else
+    {
+        
+        Console.WriteLine("Immagine del grafico non trovata.");
+    }
+}
+       
     }
 }
