@@ -52,15 +52,15 @@ partial class Form1
         // 
         // Form1
         // 
-        this.ClientSize = new Size(1000, 600); // Più grande per ospitare la catena
-        this.BackColor = Color.FromArgb(24, 28, 36); // Colore scuro dell'immagine
+        this.ClientSize = new Size(1000, 600); 
+        this.BackColor = Color.FromArgb(24, 28, 36); 
         this.Text = "BlockchainHome";
 
         //Grafico
         this.picGrafico = new PictureBox();
-        this.picGrafico.Size = new Size(600, 400); // Dimensione adatta al grafico
-        this.picGrafico.Location = new Point(20, 200); // Posizionalo sotto le card delle statistiche
-        this.picGrafico.SizeMode = PictureBoxSizeMode.Zoom; // Mantiene le proporzioni (Software Robusto)
+        this.picGrafico.Size = new Size(600, 400); 
+        this.picGrafico.Location = new Point(20, 200); 
+        this.picGrafico.SizeMode = PictureBoxSizeMode.Zoom; 
         this.picGrafico.Visible = false;
         this.pnlContainer.Controls.Add(this.picGrafico);
 
