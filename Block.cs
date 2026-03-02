@@ -8,12 +8,12 @@ namespace Blockchain.Core
         public required int Index { get; init; }
         public required long Timestamp { get; init; }
         
-        // MODIFICA: Da string a List per gestire i dati reali di Go
         public List<TransactionData>? Transactions { get; init; }
 
         public required string PreviousHash { get; init; }
         public required string Hash { get; init; }
         public required int Nonce { get; init; }
+        public required int Height { get; init; }
 
         // Metodo ToString aggiornato per gestire stringhe corte (Software Robusto)
         public override string ToString()

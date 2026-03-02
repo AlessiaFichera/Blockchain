@@ -2,8 +2,8 @@
     "statistiche": {
         "tempo_medio_mining": 500.0,
         "totale_transazioni": 7,
-        "utxo_totale": 7,
-        "valore_medio_euro": 3.66
+        "utxo_totale": 4,
+        "valore_medio_euro": 29.56
     },
     "file_grafico": "grafico_blockchain.png"
 }

@@ -14,6 +14,7 @@ partial class Form1
     private Button btnAnalitiche;
 
     private PictureBox picGrafico;
+    private Button btnUTXOSet;
 
 
      private System.ComponentModel.IContainer components = null;
@@ -47,6 +48,7 @@ partial class Form1
         btnInviaTransazione = new Button();
         btnVisualizzaBlockchain = new Button();
         btnAnalitiche = new Button();
+        btnUTXOSet = new Button();
         // 
         // Form1
         // 
@@ -98,6 +100,7 @@ partial class Form1
         StilizzaBottone(btnInviaTransazione, "Cronologia Transazioni", 220);
         StilizzaBottone(btnVisualizzaBlockchain, "Visualizza Blockchain", 290);
         StilizzaBottone(btnAnalitiche, "Analitiche", 360);
+        StilizzaBottone(btnUTXOSet, "UTXO Set", 430);
         
     
         // I bottoni delle azioni li aggiungiamo inizialmente al form centrale
@@ -109,6 +112,7 @@ partial class Form1
         pnlContainer.Controls.Add(btnInviaTransazione);
         pnlContainer.Controls.Add(btnVisualizzaBlockchain);
         pnlContainer.Controls.Add(btnAnalitiche);
+        pnlContainer.Controls.Add(btnUTXOSet);
     }
 
     private void StilizzaBottone(Button btn, string testo, int y)

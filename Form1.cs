@@ -27,9 +27,9 @@ namespace Blockchain
             btnAggiungiWallet.Click += BtnAggiungiWallet_Click;
             btnInviaTransazione.Click += BtnInviaTransazione_Click;
             btnAnalitiche.Click += BtnAnalitiche_Click;
+            btnUTXOSet.Click += BtnUTXOSet_Click;
 
-            // Sottoscrizione all'evento della logica per aggiornamenti in tempo reale
-            _blockchainManager.BlockAdded += BlockchainManager_BlockAdded;
+            
 
             
         }
@@ -138,14 +138,33 @@ private void BtnAnalitiche_Click(object? sender, EventArgs e)
     }
     else
     {
-        MessageBox.Show("Il file wallet.json non è stato trovato.");
+        MessageBox.Show("Il file transazioni.json non è stato trovato.");
     }
         }
-        private void BlockchainManager_BlockAdded(object? sender, BlockAddedEventArgs e)
-        {
-            // Notifica all'utente che un nuovo oggetto (blocco) è stato creato,testato + avanti
-            MessageBox.Show($"Nuovo blocco aggiunto: {e.NewBlock.Index}", "Blockchain Update", MessageBoxButtons.OK, MessageBoxIcon.Information);
-        }
+    private void BtnUTXOSet_Click(object? sender, EventArgs e)
+{
+    _blockchainManager.EseguiAggiornamentoPython();
+
+    string nomeFile = "utxoset.json"; 
+
+    if (File.Exists(nomeFile))
+    {
+        // Leggiamo tutto il testo del file JSON
+        string contenutoJson = File.ReadAllText(nomeFile);
+        
+        // Entriamo nella modalità grafica
+        EntraInModalitaDettaglio("UTXOSET");
+        
+        // Chiamiamo la funzione di stampa passandogli i dati veri
+        VisualizzaUTXOSet(contenutoJson);
+    }
+    else
+    {
+        MessageBox.Show("File utxoset.json non trovato!");
+    }
+}
+
+      
 
         private void EntraInModalitaDettaglio(string modalita)
 {
@@ -194,6 +213,7 @@ private void BtnAnalitiche_Click(object? sender, EventArgs e)
                     bloccoDati.Transactions,
                     bloccoDati.Hash,
                     bloccoDati.Nonce.ToString(),
+                    bloccoDati.Height,
                     true
                 );
                 
@@ -218,7 +238,7 @@ private void BtnAnalitiche_Click(object? sender, EventArgs e)
             }
         }
 
-        private Panel CreaSingoloBlocco(string id, List<TransactionData>? transactions, string hash,string nonce, bool isValid)
+        private Panel CreaSingoloBlocco(string id, List<TransactionData>? transactions, string hash,string nonce,int height, bool isValid)
         {
             Panel card = new Panel
             {
@@ -282,6 +302,16 @@ private void BtnAnalitiche_Click(object? sender, EventArgs e)
                 Size = new Size(200, 25),
                 TextAlign = ContentAlignment.MiddleCenter
             };
+            Label lblHeight = new Label
+            {
+                Text = "Height:" + height,
+                BackColor = Color.FromArgb(45, 45, 45),
+                ForeColor = Color.White,
+                Location = new Point(10, 230),
+                Size = new Size(200, 25),
+                TextAlign = ContentAlignment.MiddleCenter
+            };
+
 
             Label lblStatus = new Label
             {
@@ -297,18 +327,19 @@ private void BtnAnalitiche_Click(object? sender, EventArgs e)
             card.Controls.Add(lblData);
             card.Controls.Add(lblHash);
             card.Controls.Add(lblNonce);
+            card.Controls.Add(lblHeight);
             card.Controls.Add(lblStatus);
 
             return card;
         }  
-        private void VisualizzaStatistiche(string jsonContenuto)
+     private void VisualizzaStatistiche(string jsonContenuto)
 {
     pnlContainer.Controls.Clear();
     var stats = _blockchainManager.EstraiAnalitiche(jsonContenuto);
     int coordinataX = 20;
     pnlContainer.AutoScroll = true; 
 
-    // Disegno delle Card (Componenti)
+    
     foreach (var s in stats)
     {
         Panel card = new Panel
@@ -334,16 +365,14 @@ private void BtnAnalitiche_Click(object? sender, EventArgs e)
 
     string percorsoImmagine = "grafico_blockchain.png";
 
-    // Verifica se il file esiste per garantire un software robusto (previene crash a runtime)
     if (File.Exists(percorsoImmagine))
     {
         PictureBox pic = new PictureBox
         {
-            // Carica l'immagine dal file generato da Python
             Image = Image.FromFile(percorsoImmagine),
-            Location = new Point(20, 180), // Posizionato sotto le card
-            Size = new Size(700, 350),     // Dimensione grande per il grafico
-            SizeMode = PictureBoxSizeMode.Zoom, // Adatta l'immagine senza sgranare
+            Location = new Point(20, 180),
+            Size = new Size(700, 350),   
+            SizeMode = PictureBoxSizeMode.Zoom, 
             BorderStyle = BorderStyle.None
         };
         
@@ -384,24 +413,13 @@ private void BtnAnalitiche_Click(object? sender, EventArgs e)
                     Font = new Font("Segoe UI", 9)
                 };
 
-                Label lblBalance = new Label
-                {
-                    Text = "Saldo: " + wallet.Balance.ToString("F2") + " BTC",
-                    ForeColor = Color.FromArgb(45, 45, 45),
-                    Location = new Point(10, 40),
-                    Size = new Size(280, 25),
-                    TextAlign = ContentAlignment.MiddleLeft,
-                    Font = new Font("Segoe UI", 9)
-                };
-
                 walletCard.Controls.Add(lblAddress);
-                walletCard.Controls.Add(lblBalance);
                 pnlContainer.Controls.Add(walletCard);
 
                 coordinataY += 100; 
             }
         }
-        private void CaricaTransazioniGrafiche(string jsonContenuto)
+       private void CaricaTransazioniGrafiche(string jsonContenuto)
 {
     pnlContainer.Controls.Clear();
     var listaTx = _blockchainManager.EstraiListaTransazioni(jsonContenuto);
@@ -411,33 +429,133 @@ private void BtnAnalitiche_Click(object? sender, EventArgs e)
     {
         Panel txCard = new Panel
         {
-            Size = new Size(400, 90),
-            BackColor = Color.FromArgb(245, 245, 245),
+            Size = new Size(600, 220),
+            BackColor = Color.WhiteSmoke,
             BorderStyle = BorderStyle.FixedSingle,
             Location = new Point(20, coordinataY)
         };
 
         Label lblId = new Label
         {
-            Text = "🆔 TX: " + (tx.ID?.Substring(0, 15) ?? "N/D") + "...",
+            Text = "TRANSACTION ID: " + (tx.ID ?? "N/D"),
             Font = new Font("Consolas", 9, FontStyle.Bold),
             Location = new Point(10, 10),
-            Size = new Size(380, 20)
+            Size = new Size(430, 20),
+            ForeColor = Color.MidnightBlue
         };
 
-        // Mostriamo il primo output come esempio di destinazione
-        var primoOut = tx.Outputs?[0];
-        Label lblDettaglio = new Label
+        var primoIn = tx.Inputs?.Count > 0 ? tx.Inputs[0] : null;
+        string testoInput = " INPUT:\n";
+        
+        if (primoIn != null)
         {
-            Text = $"Inviati {primoOut?.Value} BTC a {primoOut?.PubKeyHash?.Substring(0, 10)}...",
+           testoInput += $"• Prev TxID: {primoIn.TxID}\n" +
+                          $"• Index:     {primoIn.OutputIndex}\n" +
+                          $"• Signature: {primoIn.Signature}\n" +
+                          $"• PubKey:    {primoIn.PubKey}";
+        }
+        else
+        {
+            testoInput += "• Transazione Coinbase (Generazione nuovi fondi)";
+        }
+
+        Label lblInput = new Label
+        {
+            Text = testoInput,
+            Font = new Font("Consolas", 9, FontStyle.Bold),
             Location = new Point(10, 40),
-            Size = new Size(380, 40)
+            Size = new Size(500, 100),
+            ForeColor = Color.Firebrick // Rosso per identificare l'origine dei fondi
         };
 
+        // 3. Sezione OUTPUT (Destinatario)
+        var primoOut = tx.Outputs?.Count > 0 ? tx.Outputs[0] : null;
+        Label lblOutput = new Label
+        {
+            Text = $"OUTPUT:\n" +
+                   $"• A: {primoOut?.PubKeyHash ?? "N/D"}\n" +
+                   $"• Valore: {primoOut?.Value} BTC",
+            Font = new Font("Consolas", 9, FontStyle.Bold),
+            Location = new Point(15, 140),
+            Size = new Size(500, 135),
+            ForeColor = Color.ForestGreen
+        };
+
+        // Aggiunta di tutti i componenti alla card
         txCard.Controls.Add(lblId);
-        txCard.Controls.Add(lblDettaglio);
+        txCard.Controls.Add(lblInput);
+        txCard.Controls.Add(lblOutput);
+
+        // Aggiunta della card al contenitore principale
         pnlContainer.Controls.Add(txCard);
-        coordinataY += 100;
+        
+        // Incremento coordinata per la card successiva (con spazio di 20px)
+        coordinataY += 220;
+    }
+}
+
+   private void VisualizzaUTXOSet(string jsonContenuto)
+{
+    pnlContainer.Controls.Clear();
+    var utxoset = _blockchainManager.EstraiUTXOSet(jsonContenuto);
+    int coordinataY = 20;
+      pnlContainer.AutoScroll = true; 
+
+    foreach (var utxo in utxoset)
+    {
+        // 1. Creazione della Card per l'UTXO
+        Panel utxoCard = new Panel
+        {
+            Size = new Size(600, 160),
+            BackColor = Color.GhostWhite,
+            BorderStyle = BorderStyle.FixedSingle,
+            Location = new Point(20, coordinataY)
+        };
+
+        // 2. Intestazione: Riferimento alla Transazione Originale
+        Label lblHeader = new Label
+        {
+            Text = $"OUTPUT NON SPESO DALLA TX: {utxo.TxID ?? "N/D"}",
+            Font = new Font("Consolas", 9, FontStyle.Bold),
+            Location = new Point(10, 10),
+            Size = new Size(580, 20),
+            ForeColor = Color.DarkSlateBlue
+        };
+
+        // 3. Dettagli dell'UTXO (Indice e provenienza)
+        Label lblDettagli = new Label
+        {
+            Text = $"• Output Index: {utxo.Index}\n",
+            Font = new Font("Consolas", 9, FontStyle.Regular),
+            Location = new Point(10, 50),
+            Size = new Size(500, 40),
+            ForeColor = Color.Black
+        };
+
+        // 4. Sezione Valore e Destinatario (PubKeyHash)
+        // Prendiamo il primo output della lista per visualizzare il valore disponibile
+        var primoOut = utxo.Outputs?.Count > 0 ? utxo.Outputs[0] : null;
+        Label lblValore = new Label
+        {
+            Text = $"DETTAGLI BILANCIO:\n" +
+                   $"• Indirizzo: {primoOut?.PubKeyHash ?? "N/D"}\n" +
+                   $"• Importo Disponibile: {primoOut?.Value} BTC",
+            Font = new Font("Consolas", 10, FontStyle.Bold),
+            Location = new Point(15, 90),
+            Size = new Size(500, 60),
+            ForeColor = Color.DarkGreen // Verde per indicare fondi disponibili
+        };
+
+        // Aggiunta dei componenti alla card
+        utxoCard.Controls.Add(lblHeader);
+        utxoCard.Controls.Add(lblDettagli);
+        utxoCard.Controls.Add(lblValore);
+
+        // Aggiunta della card al contenitore
+        pnlContainer.Controls.Add(utxoCard);
+
+        // Incremento coordinata (altezza card 160 + 20px di margine)
+        coordinataY += 180;
     }
 }
        

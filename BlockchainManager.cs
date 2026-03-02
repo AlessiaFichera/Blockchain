@@ -35,13 +35,14 @@ namespace Blockchain.Core
                 Transactions = new List<TransactionData>(), 
                 PreviousHash = "0", 
                 Hash = "GENESIS_HASH",
-                Nonce = 0
+                Nonce = 0,
+                Height = 1
             };
             _chain.Add(genesis);
         }
 
         // Metodo per aggiungere blocchi locali
-        public void AddBlock(List<TransactionData> transactions, string hash, int nonce)
+        public void AddBlock(List<TransactionData> transactions, string hash, int nonce, int height)
     {
         try 
         {
@@ -53,7 +54,8 @@ namespace Blockchain.Core
                 Transactions = transactions, // Ora accettiamo la lista di componenti transazione
                 PreviousHash = lastBlock.Hash,
                 Hash = hash,
-                Nonce = nonce
+                Nonce = nonce,
+                Height = height
             };
 
             _chain.Add(newBlock);
@@ -166,10 +168,8 @@ public class StatisticaUI
 {
     try 
     {
-        // 1. Type Safety: Opzioni per far corrispondere il JSON ai Metadata C#
         var options = new JsonSerializerOptions { PropertyNameCaseInsensitive = true };
         
-        // 2. Deserializzazione: Usiamo il tipo annullabile '?' come nelle slide
         var root = JsonSerializer.Deserialize<WalletRoot>(jsonRicevuto, options);
         
         if (root == null || root.Accounts == null) 
@@ -185,8 +185,7 @@ public class StatisticaUI
             // Aggiungiamo l'oggetto WalletAccount con i dati da Go
             listaWallet.Add(new WalletAccount 
             { 
-                Address = acc.Address ?? "Indirizzo non trovato", 
-                Balance = acc.Balance 
+                Address = acc.Address ?? "Indirizzo non trovato"
             });
         }
 
@@ -194,7 +193,6 @@ public class StatisticaUI
     }
     catch (Exception ex) 
     { 
-        // 3. Software Robusto: Gestione errori a runtime
         Console.WriteLine($"Errore caricamento Wallet: {ex.Message}");
         return new List<WalletAccount>(); 
     } 
@@ -218,6 +216,7 @@ public List<TransactionData> EstraiListaTransazioni(string jsonRicevuto)
             listaTransazioni.Add(new TransactionData 
             { 
                 ID = tx.ID ?? "ID Sconosciuto",
+                Inputs = tx.Inputs ?? new List<TxInputData>(),
                 Outputs = tx.Outputs ?? new List<TxOutputData>() 
             });
         }
@@ -229,6 +228,45 @@ public List<TransactionData> EstraiListaTransazioni(string jsonRicevuto)
         // Catturiamo l'eccezione per non far chiudere il programma
         Console.WriteLine($"Errore critico transazioni: {ex.Message}");
         return new List<TransactionData>(); 
+    } 
+}
+public List<Utxo> EstraiUTXOSet(string jsonRicevuto)
+{
+    try 
+    {
+        // Impostiamo la case-insensitivity per far corrispondere i campi Go (es. TxID) alle proprietà C#
+        var options = new JsonSerializerOptions { PropertyNameCaseInsensitive = true };
+        
+        // Deserializziamo il JSON. Se il backend invia un oggetto radice, usiamo UtxoRoot, 
+        // altrimenti deserializziamo direttamente in una List<Utxo>.
+        var listaUtxo = JsonSerializer.Deserialize<List<Utxo>>(jsonRicevuto, options);
+        
+        if (listaUtxo == null) 
+        {
+            return new List<Utxo>(); 
+        }
+
+        var risultato = new List<Utxo>();
+
+        foreach (var utxo in listaUtxo)
+        {
+            risultato.Add(new Utxo 
+            { 
+                // Mappatura dei dati basata sul file utxo.go
+                TxID = utxo.TxID ?? "ID Transazione Sconosciuto",
+                Index = utxo.Index,
+                // Mappatura dei dati basata su transaction_output.go
+                Outputs = utxo.Outputs ?? new List<TxOutputData>() 
+            });
+        }
+
+        return risultato;
+    }
+    catch (Exception ex) 
+    { 
+        // Gestione dell'errore per evitare il crash dell'interfaccia grafica
+        Console.WriteLine($"Errore critico durante l'estrazione dell'UTXO Set: {ex.Message}");
+        return new List<Utxo>(); 
     } 
 }
     
