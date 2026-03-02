@@ -7,10 +7,6 @@ import (
 	"os"
 )
 
-const (
-	walletFile = "wallet.dat"
-)
-
 // Gestisce l'insieme di account
 type Wallet struct {
 	Accounts map[string]*Account

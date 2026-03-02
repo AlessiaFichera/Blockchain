@@ -13,7 +13,8 @@ var (
 	blocksBucket   = []byte("blocks")   // bucket: hash del blocco -> blocco
 	utxoBucket     = []byte("utxo")     // bucket: hash della transazione + indice UTXO -> UTXO della transazione
 	metadataBucket = []byte("metadata") // bucket per info varie
-	lastHashKey    = []byte("last")     // chiave per lastHash in metadataBucket
+	lastHashKey    = []byte("lastHash") // chiave per lastHash in metadataBucket
+	heightKey      = []byte("height")   // chiave per lastHeight in metadataBucket
 )
 
 // Implementa l'interfaccia Storage per BoltDB
@@ -50,8 +51,11 @@ func NewBoltStorage(dbPath string) (*BoltStorage, error) {
 }
 
 // Salva l'ultimo blocco nel DB
-func (s *BoltStorage) SaveBlock(hash []byte, block *Block) error {
+func (s *BoltStorage) SaveBlock(block *Block) error {
 	transactions := block.Transactions
+	hash := block.Hash
+	height := make([]byte, 4)
+	binary.BigEndian.PutUint32(height, uint32(block.Height))
 
 	blockBytes, err := serialize(block)
 	if err != nil {
@@ -67,6 +71,10 @@ func (s *BoltStorage) SaveBlock(hash []byte, block *Block) error {
 
 		b = tx.Bucket(metadataBucket)
 		err = b.Put(lastHashKey, hash)
+		if err != nil {
+			return err
+		}
+		err = b.Put(heightKey, height)
 		if err != nil {
 			return err
 		}
@@ -100,6 +108,25 @@ func (s *BoltStorage) GetLastHash() ([]byte, error) {
 		return nil
 	})
 	return hash, err
+}
+
+// Restituisce l'height dell'ultimo blocco
+func (s *BoltStorage) GetHeight() (int, error) {
+	var intHeight int
+	err := s.db.View(func(tx *bbolt.Tx) error {
+		b := tx.Bucket(metadataBucket)
+		height := b.Get(heightKey)
+
+		if len(height) == 0 {
+			intHeight = 0
+			return nil
+		}
+
+		intHeight = int(binary.BigEndian.Uint32(height))
+		return nil
+	})
+
+	return intHeight, err
 }
 
 /*

@@ -16,16 +16,31 @@ type Blockchain struct {
 
 // Crea un blocco con i dati in input e lo aggiunge alla catena
 func (bc *Blockchain) AddBlock(transactions []*Transaction) error {
-	newBlock := NewBlock(transactions, bc.tip)
-	if err := bc.storage.SaveBlock(newBlock.Hash, newBlock); err != nil {
+	height, err := bc.storage.GetHeight()
+	if err != nil {
+		return err
+	}
+	height += 1
+	newBlock := NewBlock(transactions, bc.tip, height)
+	if err := bc.storage.SaveBlock(newBlock); err != nil {
 		return err
 	}
 	bc.tip = newBlock.Hash
 	return nil
 }
 
-// Crea una nuova blockchain con un Genesis block
-func NewBlockchain(address string, s Storage) (*Blockchain, error) {
+// Restituisce la blockchain
+func NewBlockchain(s Storage) (*Blockchain, error) {
+	lastHash, err := s.GetLastHash()
+	if err != nil {
+		return nil, err
+	}
+
+	return &Blockchain{tip: lastHash, storage: s}, nil
+}
+
+// Restituisce la blockchain, se non trova blocchi crea il Genesis block
+func NewBlockchainWithGB(address string, s Storage) (*Blockchain, error) {
 	lastHash, err := s.GetLastHash()
 	if err != nil {
 		return nil, err
@@ -38,7 +53,7 @@ func NewBlockchain(address string, s Storage) (*Blockchain, error) {
 		cbtx := NewCoinbaseTX(address, genesisBlockData)
 		genesis := NewGenesisBlock(cbtx)
 
-		if err := s.SaveBlock(genesis.Hash, genesis); err != nil {
+		if err := s.SaveBlock(genesis); err != nil {
 			return nil, err
 		}
 		bc.tip = genesis.Hash

@@ -1,0 +1,30 @@
+services:
+  central-node:
+    build: .
+    container_name: central_node
+    environment:
+      - PORT=8080
+      - NODE_NAME=central-node  #uguale al nome del servizio
+      - DB_FILE=/data/centralnode.db
+      - WALLET_FILE=/data/centralnode_wallet.dat
+    ports:
+      - "8080:8080"
+    volumes:
+      - central_data:/data
+  
+  node1:
+    build: .
+    container_name: node_1
+    environment:
+      - PORT=8081
+      - NODE_NAME=node1
+      - DB_FILE=/data/node1.db
+      - WALLET_FILE=/data/node1_wallet.dat
+    ports:
+      - "8081:8080"
+    volumes:
+      - node1_data:/data
+
+volumes:
+  central_data:
+  node1_data:

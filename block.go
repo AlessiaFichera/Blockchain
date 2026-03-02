@@ -15,14 +15,16 @@ type Block struct {
 	PrevBlockHash []byte
 	Hash          []byte
 	Nonce         int
+	Height        int
 }
 
 // Restituisce un nuovo blocco
-func NewBlock(transactions []*Transaction, prevBlockHash []byte) *Block {
+func NewBlock(transactions []*Transaction, prevBlockHash []byte, height int) *Block {
 	block := &Block{
 		Timestamp:     time.Now().Unix(),
 		Transactions:  transactions,
 		PrevBlockHash: prevBlockHash,
+		Height:        height,
 	}
 
 	pow := NewProofOfWork(block)
@@ -33,7 +35,7 @@ func NewBlock(transactions []*Transaction, prevBlockHash []byte) *Block {
 
 // Restituisce un GenesisBlock
 func NewGenesisBlock(coinbase *Transaction) *Block {
-	return NewBlock([]*Transaction{coinbase}, []byte{})
+	return NewBlock([]*Transaction{coinbase}, []byte{}, 1)
 }
 
 // Restituisce un hash identificatore delle transazioni in un blocco
