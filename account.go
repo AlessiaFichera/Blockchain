@@ -31,15 +31,18 @@ func NewAccount() (*Account, error) {
 	if err != nil {
 		return nil, err
 	}
-	public := append(privateECDSA.PublicKey.X.Bytes(), privateECDSA.PublicKey.Y.Bytes()...)
-	private := privateECDSA.D.Bytes()
+	pubKey := make([]byte, 64)
+	privateECDSA.PublicKey.X.FillBytes(pubKey[0:32])
+	privateECDSA.PublicKey.Y.FillBytes(pubKey[32:64])
 
-	return &Account{private, public}, nil
+	private := make([]byte, 32)
+	privateECDSA.D.FillBytes(private)
+	return &Account{private, pubKey}, nil
 }
 
 // Restituisce l'Address di un Account: Base58(version | PubKeyHash | checksum)
 func (account Account) GetAddress() string {
-	pubKeyHash := hashPubKey(account.PublicKey)
+	pubKeyHash := HashPubKey(account.PublicKey)
 
 	payload := make([]byte, 0, addressLen)
 
@@ -75,7 +78,7 @@ func AddressToPubKeyHash(address string) []byte {
 }
 
 // Restituisce l'hash della chiave pubblica: RIPEMD160(SHA256(PubKey))
-func hashPubKey(pubKey []byte) []byte {
+func HashPubKey(pubKey []byte) []byte {
 	hashSHA256 := sha256.Sum256(pubKey)
 
 	hasher := ripemd160.New()

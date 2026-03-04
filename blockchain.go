@@ -14,21 +14,6 @@ type Blockchain struct {
 	storage Storage
 }
 
-// Crea un blocco con i dati in input e lo aggiunge alla catena
-func (bc *Blockchain) AddBlock(transactions []*Transaction) error {
-	height, err := bc.storage.GetHeight()
-	if err != nil {
-		return err
-	}
-	height += 1
-	newBlock := NewBlock(transactions, bc.tip, height)
-	if err := bc.storage.SaveBlock(newBlock); err != nil {
-		return err
-	}
-	bc.tip = newBlock.Hash
-	return nil
-}
-
 // Restituisce la blockchain
 func NewBlockchain(s Storage) (*Blockchain, error) {
 	lastHash, err := s.GetLastHash()
@@ -50,13 +35,15 @@ func NewBlockchainWithGB(address string, s Storage) (*Blockchain, error) {
 
 	if len(lastHash) == 0 {
 		fmt.Println("Nessuna blockchain trovata. Generazione Genesis Block ...")
-		cbtx := NewCoinbaseTX(address, genesisBlockData)
-		genesis := NewGenesisBlock(cbtx)
 
-		if err := s.SaveBlock(genesis); err != nil {
+		genesis, err := bc.MineNewBlock(address, "", []*Transaction{})
+		if err != nil {
 			return nil, err
 		}
-		bc.tip = genesis.Hash
+		err = bc.AddBlockToChain(genesis)
+		if err != nil {
+			return nil, err
+		}
 
 	} else {
 		fmt.Printf("Blockchain caricata. Ultimo hash: %x\n", lastHash)
@@ -64,6 +51,44 @@ func NewBlockchainWithGB(address string, s Storage) (*Blockchain, error) {
 	}
 
 	return bc, nil
+}
+
+// Mina un nuovo blocco e lo restituisce
+func (bc *Blockchain) MineNewBlock(address string, dataCoinbase string, transactions []*Transaction) (*Block, error) {
+	height, err := bc.storage.GetHeight()
+	if err != nil {
+		return nil, err
+	}
+
+	if dataCoinbase == "" {
+		if height == 0 {
+			dataCoinbase = genesisBlockData
+		} else {
+			dataCoinbase = "Reward per il blocco"
+		}
+
+	}
+
+	cbtx := NewCoinbaseTX(address, dataCoinbase)
+
+	var txs []*Transaction
+	txs = append(txs, cbtx)
+	txs = append(txs, transactions...)
+
+	newBlock := NewBlock(txs, bc.tip, height+1)
+
+	return newBlock, nil
+}
+
+// Aggiunge un blocco alla catena
+func (bc *Blockchain) AddBlockToChain(block *Block) error {
+	if err := bc.storage.SaveBlock(block); err != nil {
+		return err
+	}
+
+	bc.tip = block.Hash
+
+	return nil
 }
 
 // Stampa la blockchain
@@ -111,17 +136,74 @@ func (bc *Blockchain) FindTransaction(ID []byte) (Transaction, error) {
 
 // Firma la transazione in input. Verifica che tutte le TxInput siano presenti in blockchain
 func (bc *Blockchain) SignTransaction(account *Account, tx *Transaction) error {
+	prevTXs, err := bc.getPrevTransactions(tx)
+	if err != nil {
+		return err
+	}
+
+	tx.Sign(account, prevTXs)
+	return nil
+}
+
+// Verifica la correttezza di una transazione
+func (bc *Blockchain) VerifyTransaction(tx *Transaction) (bool, error) {
+	if tx.IsCoinbase() {
+		return true, nil
+	}
+
+	prevTXs, err := bc.getPrevTransactions(tx)
+	if err != nil {
+		return false, err
+	}
+
+	var inputSum int
+	for _, vin := range tx.Vin {
+		prevTx := prevTXs[hex.EncodeToString(vin.Txid)]
+		targetOutput := prevTx.Vout[vin.Vout]
+
+		// Verifica la presenza degli UTXO
+		exists, err := bc.storage.CheckUTXO(vin.Txid, vin.Vout)
+		if err != nil {
+			return false, fmt.Errorf("errore database durante controllo UTXO: %w", err)
+		}
+		if !exists {
+			return false, fmt.Errorf("tentativo di Double Spending: output %x[%d] già speso", vin.Txid, vin.Vout)
+		}
+
+		// Verifica che l'UTXO utilizzato sia effettivamente di chi sta provando a spenderlo
+		pubKeyHash := HashPubKey(vin.PubKey)
+		if !bytes.Equal(pubKeyHash, targetOutput.PubKeyHash) {
+			return false, fmt.Errorf("il mittente non è il proprietario dell'output %x[%d]", vin.Txid, vin.Vout)
+		}
+
+		inputSum += targetOutput.Value
+	}
+
+	var outputSum int
+	for _, vout := range tx.Vout {
+		outputSum += vout.Value
+	}
+
+	// Verifica bilancio (inputSum >= outputSum)
+	if inputSum < outputSum {
+		return false, fmt.Errorf("fondi insufficienti: input (%d) < output (%d)", inputSum, outputSum)
+	}
+
+	// Verifica firma
+	return tx.VerifySignature(prevTXs)
+}
+
+// Recupera le transazioni precedenti a cui una nuova transazione si riferisce
+func (bc *Blockchain) getPrevTransactions(tx *Transaction) (map[string]Transaction, error) {
 	prevTXs := make(map[string]Transaction)
 
 	for _, vin := range tx.Vin {
 		prevTX, err := bc.FindTransaction(vin.Txid)
 		if err != nil {
-			return err
+			return nil, err
 		}
 		prevTXs[hex.EncodeToString(prevTX.ID)] = prevTX
 	}
 
-	tx.Sign(account, prevTXs)
-
-	return nil
+	return prevTXs, nil
 }

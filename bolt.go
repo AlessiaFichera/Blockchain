@@ -10,11 +10,12 @@ import (
 )
 
 var (
-	blocksBucket   = []byte("blocks")   // bucket: hash del blocco -> blocco
-	utxoBucket     = []byte("utxo")     // bucket: hash della transazione + indice UTXO -> UTXO della transazione
-	metadataBucket = []byte("metadata") // bucket per info varie
-	lastHashKey    = []byte("lastHash") // chiave per lastHash in metadataBucket
-	heightKey      = []byte("height")   // chiave per lastHeight in metadataBucket
+	blocksBucket     = []byte("blocks")     // bucket: hash del blocco -> blocco
+	utxoBucket       = []byte("utxo")       // bucket: hash della transazione + indice UTXO -> UTXO della transazione
+	metadataBucket   = []byte("metadata")   // bucket per info varie
+	candidatesBucket = []byte("candidates") //bucket per i blocchi candidati, verrà utilizzato solo dai miner
+	lastHashKey      = []byte("lastHash")   // chiave per lastHash in metadataBucket
+	heightKey        = []byte("height")     // chiave per lastHeight in metadataBucket
 )
 
 // Implementa l'interfaccia Storage per BoltDB
@@ -40,6 +41,10 @@ func NewBoltStorage(dbPath string) (*BoltStorage, error) {
 			return err
 		}
 		_, err = tx.CreateBucketIfNotExists(utxoBucket)
+		if err != nil {
+			return err
+		}
+		_, err = tx.CreateBucketIfNotExists(candidatesBucket)
 		if err != nil {
 			return err
 		}
@@ -97,6 +102,43 @@ func (s *BoltStorage) GetBlock(hash []byte) (*Block, error) {
 	}
 
 	return deserialize[*Block](val)
+}
+
+// Salva un blocco candidato
+func (s *BoltStorage) SaveCandidateBlock(block *Block) error {
+	blockBytes, err := serialize(block)
+	if err != nil {
+		return err
+	}
+
+	return s.db.Update(func(tx *bbolt.Tx) error {
+		b := tx.Bucket(candidatesBucket)
+		return b.Put(block.Hash, blockBytes)
+	})
+}
+
+// Restituisce un blocco candidato dato l'hash
+func (s *BoltStorage) GetCandidateBlock(hash []byte) (*Block, error) {
+	var val []byte
+	err := s.db.View(func(tx *bbolt.Tx) error {
+		b := tx.Bucket(candidatesBucket)
+		val = b.Get(hash)
+		return nil
+	})
+
+	if err != nil || val == nil {
+		return &Block{}, err
+	}
+
+	return deserialize[*Block](val)
+}
+
+// Rimuove un blocco candidato
+func (s *BoltStorage) DeleteCandidateBlock(hash []byte) error {
+	return s.db.Update(func(tx *bbolt.Tx) error {
+		b := tx.Bucket(candidatesBucket)
+		return b.Delete(hash)
+	})
 }
 
 // Restituisce l'hash dell'ultimo blocco
@@ -164,6 +206,21 @@ func (s *BoltStorage) GetUTXO(pubKeyHash []byte, amount int) (int, []UTXO, error
 		return nil
 	})
 	return accumulated, unspentOutputs, err
+}
+
+// Verifica se un determinato UTXO è presente nel bucket UTXO
+func (s *BoltStorage) CheckUTXO(txID []byte, index int) (bool, error) {
+	key := constructUTXOKey(txID, index)
+	var exists bool
+
+	err := s.db.View(func(tx *bbolt.Tx) error {
+		b := tx.Bucket(utxoBucket)
+		val := b.Get(key)
+		exists = (val != nil)
+		return nil
+	})
+
+	return exists, err
 }
 
 // Aggiorna utxobucket dopo l'aggiunta di un nuovo blocco nella blockchain
