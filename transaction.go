@@ -6,6 +6,7 @@ import (
 	"crypto/elliptic"
 	"crypto/rand"
 	"crypto/sha256"
+	"encoding/binary"
 	"encoding/gob"
 	"encoding/hex"
 	"fmt"
@@ -58,15 +59,52 @@ func NewCoinbaseTX(to, data string) *Transaction {
 
 // Restituisce l'hash della transazione. Errore se tx è nil
 func (tx *Transaction) Hash() ([]byte, error) {
-	// Creiamo una copia su cui calcolare l'hash
-	txCopy := *tx
-	txCopy.ID = nil
+	var buf bytes.Buffer
 
-	data, err := txCopy.serialize()
-	if err != nil {
-		return nil, err
+	for _, vin := range tx.Vin {
+		buf.Write(vin.Txid)
+
+		vout := int32(vin.Vout)
+		binary.Write(&buf, binary.BigEndian, vout)
 	}
-	hash := sha256.Sum256(data)
+
+	for _, vout := range tx.Vout {
+		value := int32(vout.Value)
+		binary.Write(&buf, binary.BigEndian, value)
+
+		buf.Write(vout.PubKeyHash)
+	}
+
+	hash := sha256.Sum256(buf.Bytes())
+	return hash[:], nil
+}
+
+func (tx *Transaction) HashForSignature(inID int, prevPubKeyHash []byte) ([]byte, error) {
+	txCopy := tx.trimmedCopy()
+
+	txCopy.Vin[inID].PubKey = prevPubKeyHash
+
+	var buf bytes.Buffer
+
+	for _, vin := range txCopy.Vin {
+		buf.Write(vin.Txid)
+
+		vout := int32(vin.Vout)
+		binary.Write(&buf, binary.BigEndian, vout)
+
+		if vin.PubKey != nil {
+			buf.Write(vin.PubKey)
+		}
+	}
+
+	for _, vout := range txCopy.Vout {
+		value := int32(vout.Value)
+		binary.Write(&buf, binary.BigEndian, value)
+
+		buf.Write(vout.PubKeyHash)
+	}
+
+	hash := sha256.Sum256(buf.Bytes())
 	return hash[:], nil
 }
 
@@ -130,31 +168,25 @@ func (tx *Transaction) Sign(account *Account, prevTXs map[string]Transaction) {
 	for inID, vin := range txCopy.Vin {
 		prevTx := prevTXs[hex.EncodeToString(vin.Txid)]
 
-		// PubKeyHash dell'output originale messo nella transazione per firmala
-		txCopy.Vin[inID].PubKey = prevTx.Vout[vin.Vout].PubKeyHash
-
-		// Preparazione Hash da firmare
 		fmt.Printf("[debug] Sign round %d: tx\n %s", inID, txCopy)
-		txCopy.ID, _ = txCopy.Hash()
-		fmt.Printf("[DEBUG-SIGN] Input %d, Hash da firmare: %x\n", inID, txCopy.ID)
+		hashToSign, _ := tx.HashForSignature(inID, prevTx.Vout[vin.Vout].PubKeyHash)
+		r, s, err := ecdsa.Sign(rand.Reader, privKey, hashToSign)
 
-		// Ripristino del campo a nil
-		txCopy.Vin[inID].PubKey = nil
-
-		// Firma dell'ID della transazione
-		r, s, err := ecdsa.Sign(rand.Reader, privKey, txCopy.ID)
 		if err != nil {
 			log.Panic(err)
 		}
 
 		signature := make([]byte, 64)
 		// Leading Zeroes per evitare troncamenti
-		copy(signature[32-len(r.Bytes()):32], r.Bytes())
-		copy(signature[64-len(s.Bytes()):64], s.Bytes())
-
+		//copy(signature[32-len(r.Bytes()):32], r.Bytes())
+		//copy(signature[64-len(s.Bytes()):64], s.Bytes())
+		r.FillBytes(signature[0:32])
+		s.FillBytes(signature[32:64])
+		fmt.Printf("[debug] Sign round %d: Signature\n %s", inID, hex.EncodeToString(signature))
 		// Inserimento firma nella transazione reale
 		tx.Vin[inID].Signature = signature
 		tx.Vin[inID].PubKey = account.PublicKey
+		fmt.Printf("[debug] Sign round %d: transazione dopo l'inserimento dei valori\n %s", inID, tx)
 	}
 }
 
@@ -175,11 +207,7 @@ func (tx *Transaction) VerifySignature(prevTXs map[string]Transaction) (bool, er
 		}
 		prevTx := prevTXs[hex.EncodeToString(vin.Txid)]
 
-		txCopy.Vin[inID].PubKey = prevTx.Vout[vin.Vout].PubKeyHash
-		fmt.Printf("[debug] VerifySignature trimmedCopy round %d: \n %s", inID, txCopy)
-		txCopy.ID, _ = txCopy.Hash()
-		fmt.Printf("[DEBUG-VERIFY] Input %d, Hash da verificare: %x\n", inID, txCopy.ID)
-		txCopy.Vin[inID].PubKey = nil
+		hashToVerify, _ := tx.HashForSignature(inID, prevTx.Vout[vin.Vout].PubKeyHash)
 
 		r := big.Int{}
 		s := big.Int{}
@@ -193,7 +221,7 @@ func (tx *Transaction) VerifySignature(prevTXs map[string]Transaction) (bool, er
 
 		rawPubKey := ecdsa.PublicKey{Curve: curve, X: &x, Y: &y}
 
-		if !ecdsa.Verify(&rawPubKey, txCopy.ID, &r, &s) {
+		if !ecdsa.Verify(&rawPubKey, hashToVerify, &r, &s) {
 			return false, fmt.Errorf("verifica di validità della firma fallita")
 		}
 	}
@@ -211,44 +239,18 @@ func (tx Transaction) String() string {
 
 	builder.WriteString("Inputs: \n")
 	for i, input := range tx.Vin {
-		builder.WriteString("     Input ")
+		builder.WriteString("    Input ")
 		builder.WriteString(strconv.Itoa(i))
 		builder.WriteString(":\n")
-
-		builder.WriteString("       TXID:      ")
-		builder.WriteString(hex.EncodeToString(input.Txid))
-		builder.WriteByte('\n')
-
-		builder.WriteString("       Out Index: ")
-		builder.WriteString(strconv.Itoa(input.Vout))
-		builder.WriteByte('\n')
-
-		if len(input.Signature) > 0 {
-			builder.WriteString("       Signature: ")
-			builder.WriteString(hex.EncodeToString(input.Signature))
-			builder.WriteByte('\n')
-		}
-
-		if len(input.PubKey) > 0 {
-			builder.WriteString("       PubKey:    ")
-			builder.WriteString(hex.EncodeToString(input.PubKey))
-			builder.WriteByte('\n')
-		}
+		builder.WriteString(input.String())
 	}
 
 	builder.WriteString("Outputs: \n")
 	for i, output := range tx.Vout {
-		builder.WriteString("     Output ")
+		builder.WriteString("    Output ")
 		builder.WriteString(strconv.Itoa(i))
 		builder.WriteString(":\n")
-
-		builder.WriteString("       Value:      ")
-		builder.WriteString(strconv.Itoa(output.Value))
-		builder.WriteByte('\n')
-
-		builder.WriteString("       PubKeyHash: ")
-		builder.WriteString(hex.EncodeToString(output.PubKeyHash))
-		builder.WriteByte('\n')
+		builder.WriteString(output.String())
 	}
 
 	return builder.String()
@@ -270,10 +272,15 @@ func (tx *Transaction) trimmedCopy() Transaction {
 		})
 	}
 
-	outputs = append(outputs, tx.Vout...)
+	//outputs = append(outputs, tx.Vout...)
+	for _, vout := range tx.Vout {
+		pubKeyHashCopy := make([]byte, len(vout.PubKeyHash))
+		copy(pubKeyHashCopy, vout.PubKeyHash)
+		outputs = append(outputs, TXOutput{vout.Value, pubKeyHashCopy})
+	}
 
 	return Transaction{
-		ID:   tx.ID,
+		ID:   nil,
 		Vin:  inputs,
 		Vout: outputs,
 	}
