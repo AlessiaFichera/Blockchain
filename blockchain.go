@@ -141,8 +141,7 @@ func (bc *Blockchain) SignTransaction(account *Account, tx *Transaction) error {
 		return err
 	}
 
-	tx.Sign(account, prevTXs)
-	return nil
+	return tx.Sign(account, prevTXs)
 }
 
 // Verifica la correttezza di una transazione

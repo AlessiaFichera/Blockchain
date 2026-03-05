@@ -7,10 +7,8 @@ import (
 	"crypto/rand"
 	"crypto/sha256"
 	"encoding/binary"
-	"encoding/gob"
 	"encoding/hex"
 	"fmt"
-	"log"
 	"math/big"
 	"strconv"
 	"strings"
@@ -52,13 +50,13 @@ func NewCoinbaseTX(to, data string) *Transaction {
 	txin := TXInput{Txid: []byte{}, Vout: -1, Signature: nil, PubKey: []byte(data)}
 	txout := NewTXOutput(subsidy, to)
 	tx := Transaction{ID: nil, Vin: []TXInput{txin}, Vout: []TXOutput{*txout}}
-	tx.ID, _ = tx.Hash()
+	tx.ID, _ = tx.hash()
 
 	return &tx
 }
 
 // Restituisce l'hash della transazione. Errore se tx è nil
-func (tx *Transaction) Hash() ([]byte, error) {
+func (tx *Transaction) hash() ([]byte, error) {
 	var buf bytes.Buffer
 
 	for _, vin := range tx.Vin {
@@ -66,38 +64,11 @@ func (tx *Transaction) Hash() ([]byte, error) {
 
 		vout := int32(vin.Vout)
 		binary.Write(&buf, binary.BigEndian, vout)
+
+		buf.Write(vin.PubKey)
 	}
 
 	for _, vout := range tx.Vout {
-		value := int32(vout.Value)
-		binary.Write(&buf, binary.BigEndian, value)
-
-		buf.Write(vout.PubKeyHash)
-	}
-
-	hash := sha256.Sum256(buf.Bytes())
-	return hash[:], nil
-}
-
-func (tx *Transaction) HashForSignature(inID int, prevPubKeyHash []byte) ([]byte, error) {
-	txCopy := tx.trimmedCopy()
-
-	txCopy.Vin[inID].PubKey = prevPubKeyHash
-
-	var buf bytes.Buffer
-
-	for _, vin := range txCopy.Vin {
-		buf.Write(vin.Txid)
-
-		vout := int32(vin.Vout)
-		binary.Write(&buf, binary.BigEndian, vout)
-
-		if vin.PubKey != nil {
-			buf.Write(vin.PubKey)
-		}
-	}
-
-	for _, vout := range txCopy.Vout {
 		value := int32(vout.Value)
 		binary.Write(&buf, binary.BigEndian, value)
 
@@ -144,7 +115,7 @@ func NewTransaction(bc *Blockchain, account *Account, to string, amount int) (*T
 	}
 
 	tx := Transaction{ID: nil, Vin: inputs, Vout: outputs}
-	tx.ID, _ = tx.Hash()
+	tx.ID, _ = tx.hash()
 	err = bc.SignTransaction(account, &tx)
 	if err != nil {
 		return nil, fmt.Errorf("errore durante la firma: %w", err)
@@ -154,40 +125,40 @@ func NewTransaction(bc *Blockchain, account *Account, to string, amount int) (*T
 }
 
 // Firma di una transazione
-func (tx *Transaction) Sign(account *Account, prevTXs map[string]Transaction) {
+func (tx *Transaction) Sign(account *Account, prevTXs map[string]Transaction) error {
 	if tx.IsCoinbase() {
-		return
+		return nil
 	}
 
 	privKey := assemblePrivateKey(account)
-	fmt.Printf("[debug] Sign inizio: tx\n %s", tx)
 
 	txCopy := tx.trimmedCopy()
-	fmt.Printf("[debug] Sign inizio trimmedCopy: tx\n %s", txCopy)
-	// Firma di ogni singola transazione: Singature e Pubey di tutte le altre transazioni devono essere nil
+
+	// Firma di ogni singola transazione: Singature e PubKey di tutte le altre transazioni devono essere nil
 	for inID, vin := range txCopy.Vin {
 		prevTx := prevTXs[hex.EncodeToString(vin.Txid)]
 
-		fmt.Printf("[debug] Sign round %d: tx\n %s", inID, txCopy)
-		hashToSign, _ := tx.HashForSignature(inID, prevTx.Vout[vin.Vout].PubKeyHash)
+		txCopy.Vin[inID].PubKey = prevTx.Vout[vin.Vout].PubKeyHash
+		hashToSign, _ := txCopy.hash()
+		txCopy.Vin[inID].PubKey = nil
+
 		r, s, err := ecdsa.Sign(rand.Reader, privKey, hashToSign)
 
 		if err != nil {
-			log.Panic(err)
+			return err
 		}
 
 		signature := make([]byte, 64)
+
 		// Leading Zeroes per evitare troncamenti
-		//copy(signature[32-len(r.Bytes()):32], r.Bytes())
-		//copy(signature[64-len(s.Bytes()):64], s.Bytes())
 		r.FillBytes(signature[0:32])
 		s.FillBytes(signature[32:64])
-		fmt.Printf("[debug] Sign round %d: Signature\n %s", inID, hex.EncodeToString(signature))
+
 		// Inserimento firma nella transazione reale
 		tx.Vin[inID].Signature = signature
 		tx.Vin[inID].PubKey = account.PublicKey
-		fmt.Printf("[debug] Sign round %d: transazione dopo l'inserimento dei valori\n %s", inID, tx)
 	}
+	return nil
 }
 
 // Verifica la correttezza di una firma
@@ -195,19 +166,19 @@ func (tx *Transaction) VerifySignature(prevTXs map[string]Transaction) (bool, er
 	if tx.IsCoinbase() {
 		return true, nil
 	}
-	fmt.Printf("[debug] VerifySignature inizio: Stampa iniziale%s", tx)
 
 	txCopy := tx.trimmedCopy()
 	curve := elliptic.P256()
-	fmt.Printf("[debug] VerifySignature inizio: trimmedCopy%s", txCopy)
 
 	for inID, vin := range tx.Vin {
 		if len(vin.Signature) == 0 || len(vin.PubKey) == 0 {
 			return false, fmt.Errorf("transazioni in input senza firma  o Chive Pubblica")
 		}
-		prevTx := prevTXs[hex.EncodeToString(vin.Txid)]
 
-		hashToVerify, _ := tx.HashForSignature(inID, prevTx.Vout[vin.Vout].PubKeyHash)
+		prevTx := prevTXs[hex.EncodeToString(vin.Txid)]
+		txCopy.Vin[inID].PubKey = prevTx.Vout[vin.Vout].PubKeyHash
+		hashToVerify, _ := txCopy.hash()
+		txCopy.Vin[inID].PubKey = nil
 
 		r := big.Int{}
 		s := big.Int{}
@@ -225,6 +196,7 @@ func (tx *Transaction) VerifySignature(prevTXs map[string]Transaction) (bool, er
 			return false, fmt.Errorf("verifica di validità della firma fallita")
 		}
 	}
+	fmt.Printf("Transazione %s: Verificata con successo", hex.EncodeToString(tx.ID))
 	return true, nil
 }
 
@@ -300,12 +272,4 @@ func assemblePrivateKey(account *Account) *ecdsa.PrivateKey {
 	priv.PublicKey.Y = Y
 
 	return priv
-}
-
-// Serializza la transazione. Errore se tx è nil
-func (tx *Transaction) serialize() ([]byte, error) {
-	var result bytes.Buffer
-	encoder := gob.NewEncoder(&result)
-	err := encoder.Encode(tx)
-	return result.Bytes(), err
 }
