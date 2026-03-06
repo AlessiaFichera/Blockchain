@@ -79,7 +79,7 @@ func StartServer(storage Storage) (*Server, error) {
 		listAddresses := wallet.GetAddresses()
 
 		var address string
-		if listAddresses != nil {
+		if len(listAddresses) > 0 {
 			address = listAddresses[0]
 		} else {
 			address, err = wallet.AddAccount()
