@@ -4,14 +4,23 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"strconv"
 )
 
 // Struttura delle richieste al server
 type Job struct {
-	Type    string           // es. "CREATE_BLOCK", "SEND_TX"
-	Data    interface{}      // i dati in ingresso
-	ResChan chan interface{} // canale dove il worker invierà il risultato
+	Type    string   // Tipo di richiesta
+	Data    any      // Dati in ingresso
+	ResChan chan any // Canale dove il server invierà il risultato
 }
+
+type TransactionRequest struct {
+	From   string `json:"from"`
+	To     string `json:"to"`
+	Amount int    `json:"amount"`
+}
+
+// Risposte all'utente:
 
 type HealthResponse struct {
 	Status  string `json:"status"`
@@ -28,19 +37,79 @@ type AddressesResponse struct {
 	Count     int      `json:"count"`
 }
 
-type TransactionRequest struct {
-	From   string `json:"from"`
-	To     string `json:"to"`
-	Amount int    `json:"amount"`
-}
-
 type MineResponse struct {
 	Message string `json:"message"`
+}
+
+type BalanceResponse struct {
+	Address string `json:"address"`
+	Result  string `json:"result"` // Conterrà il valore o l'errore
+}
+
+type PeersResponse struct {
+	Count int      `json:"count"`
+	Peers []string `json:"peers"`
+}
+
+type MempoolResponse struct {
+	Count int      `json:"count"`
+	Txs   []string `json:"txs"`
+}
+
+type TransactionResponse struct {
+	Status  string `json:"status"`
+	Message string `json:"message"`
+	TxID    string `json:"tx_id"`
+}
+
+type BlockInfo struct {
+	Timestamp    string            `json:"timestamp"`
+	PrevHash     string            `json:"prev_hash"`
+	Hash         string            `json:"hash"`
+	Nonce        int               `json:"nonce"`
+	Transactions []TransactionInfo `json:"transactions"`
+	Height       int               `json:"height"`
+}
+
+type BlockchainResponse struct {
+	Blocks []BlockInfo `json:"blocks"`
+}
+
+type TransactionInfo struct {
+	ID   string         `json:"id"`
+	Vin  []TXInputInfo  `json:"vin"`
+	Vout []TXOutputInfo `json:"vout"`
+}
+
+type TXInputInfo struct {
+	Txid      string `json:"txid"`
+	Vout      int    `json:"vout_index"`
+	Signature string `json:"signature"`
+	PubKey    string `json:"pubkey"`
+}
+
+type TXOutputInfo struct {
+	Value      int    `json:"value"`
+	PubKeyHash string `json:"pubkey_hash"`
+}
+
+type UTXOInfo struct {
+	TxID       string `json:"tx_id"`
+	Index      int    `json:"index"`
+	Value      int    `json:"value"`
+	PubKeyHash string `json:"pub_key_hash"`
+}
+
+type UTXOSetResponse struct {
+	Count int        `json:"count"`
+	UTXOs []UTXOInfo `json:"utxos"`
 }
 
 // Configura gli endpoint
 func SetupRouter(server *Server) *http.ServeMux {
 	mux := http.NewServeMux()
+
+	// Richieste utente API:
 
 	mux.HandleFunc("/api/health", healthHandler)
 
@@ -48,13 +117,27 @@ func SetupRouter(server *Server) *http.ServeMux {
 
 	mux.HandleFunc("/api/get-addresses", getAddressesHandler)
 
+	mux.HandleFunc("/api/mine", activateMineHandler(server))
+
+	mux.HandleFunc("/api/get-balance", getBalanceHandler(server))
+
+	mux.HandleFunc("/api/get-peers", getPeersHandler(server))
+
+	mux.HandleFunc("/api/get-mempool", getMempoolHandler(server))
+
+	mux.HandleFunc("/api/tx", sendTxHandler(server))
+
+	mux.HandleFunc("/api/print-blockchain", printBlockchainHandler(server))
+
+	mux.HandleFunc("/api/print-utxoset", getUTXOSetHandler(server))
+
+	// Messaggi tra nodi P2P:
+
 	mux.HandleFunc("/p2p/version", versionHandler(server))
 
 	mux.HandleFunc("/p2p/get-blocks", getBlocksHandler(server))
 
 	mux.HandleFunc("/p2p/blocks", blocksHandler(server))
-
-	mux.HandleFunc("/api/tx", sendTxHandler(server))
 
 	mux.HandleFunc("/p2p/receive-tx", receiveTxHandler(server))
 
@@ -62,23 +145,10 @@ func SetupRouter(server *Server) *http.ServeMux {
 
 	mux.HandleFunc("/p2p/get-data", getDataHandler(server))
 
-	mux.HandleFunc("/api/mine", activateMineHandler(server))
-
-	mux.HandleFunc("/api/get-balance", getBalanceHandler(server))
-
 	return mux
 }
 
-// Funzione di utilità per gestire gli errori in JSON
-func sendError(w http.ResponseWriter, message string, code int) {
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(code)
-	response := map[string]string{
-		"status": "error",
-		"detail": message,
-	}
-	prettyPrint(w, response)
-}
+// API handler:
 
 func healthHandler(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
@@ -132,6 +202,152 @@ func getAddressesHandler(w http.ResponseWriter, r *http.Request) {
 
 	prettyPrint(w, response)
 }
+
+func activateMineHandler(s *Server) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+
+		var req struct {
+			Address string `json:"address"`
+		}
+		if err := json.NewDecoder(r.Body).Decode(&req); err != nil || req.Address == "" {
+			sendError(w, "Indirizzo mancante nel body", http.StatusBadRequest)
+			return
+		}
+
+		resChan := make(chan any)
+		s.JobChan <- Job{
+			Type:    "ACTIVATE_MINE",
+			Data:    req.Address,
+			ResChan: resChan,
+		}
+
+		rawResponse := <-resChan
+		response := rawResponse.(MineResponse)
+
+		w.Header().Set("Content-Type", "application/json")
+		prettyPrint(w, response)
+	}
+}
+
+func getBalanceHandler(s *Server) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		address := r.URL.Query().Get("address")
+		if address == "" {
+			sendError(w, "Parametro 'address' mancante", http.StatusBadRequest)
+			return
+		}
+
+		resChan := make(chan any)
+
+		s.JobChan <- Job{
+			Type:    "GET_BALANCE",
+			Data:    address,
+			ResChan: resChan,
+		}
+
+		rawResponse := <-resChan
+		response := rawResponse.(BalanceResponse)
+
+		// Verifichiamo se il risultato è numerico, se non è un numero, lo trattiamo come errore
+		if _, err := strconv.Atoi(response.Result); err != nil {
+			sendError(w, response.Result, http.StatusInternalServerError)
+			return
+		}
+
+		w.Header().Set("Content-Type", "application/json")
+		prettyPrint(w, response)
+	}
+}
+
+func getPeersHandler(s *Server) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+
+		resChan := make(chan any)
+
+		s.JobChan <- Job{
+			Type:    "GET_PEERS",
+			ResChan: resChan,
+		}
+
+		rawResponse := <-resChan
+		response := rawResponse.(PeersResponse)
+
+		w.Header().Set("Content-Type", "application/json")
+		prettyPrint(w, response)
+	}
+}
+
+func getMempoolHandler(s *Server) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		resChan := make(chan any)
+
+		s.JobChan <- Job{
+			Type:    "GET_MEMPOOL",
+			ResChan: resChan,
+		}
+
+		rawResponse := <-resChan
+		response := rawResponse.(MempoolResponse)
+
+		w.Header().Set("Content-Type", "application/json")
+		prettyPrint(w, response)
+	}
+}
+
+func sendTxHandler(s *Server) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		var req TransactionRequest
+		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+			http.Error(w, "Invalid Request", http.StatusBadRequest)
+			return
+		}
+
+		resChan := make(chan any)
+
+		s.JobChan <- Job{
+			Type:    "SEND_LOCAL_TX",
+			Data:    req,
+			ResChan: resChan,
+		}
+
+		rawResponse := <-resChan
+
+		if err, ok := rawResponse.(error); ok {
+			sendError(w, err.Error(), http.StatusBadRequest)
+			return
+		}
+
+		response := rawResponse.(TransactionResponse)
+
+		w.Header().Set("Content-Type", "application/json")
+		prettyPrint(w, response)
+	}
+}
+
+func printBlockchainHandler(s *Server) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		resChan := make(chan any)
+
+		s.JobChan <- Job{
+			Type:    "PRINT_BLOCKCHAIN",
+			ResChan: resChan,
+		}
+
+		rawResponse := <-resChan
+
+		if err, ok := rawResponse.(error); ok {
+			sendError(w, err.Error(), http.StatusBadRequest)
+			return
+		}
+
+		response := rawResponse.(BlockchainResponse)
+
+		w.Header().Set("Content-Type", "application/json")
+		prettyPrint(w, response)
+	}
+}
+
+// P2P Handler:
 
 func versionHandler(s *Server) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
@@ -188,38 +404,6 @@ func blocksHandler(s *Server) http.HandlerFunc {
 	}
 }
 
-func sendTxHandler(s *Server) http.HandlerFunc {
-	return func(w http.ResponseWriter, r *http.Request) {
-		var req TransactionRequest
-		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-			http.Error(w, "Invalid Request", http.StatusBadRequest)
-			return
-		}
-
-		resChan := make(chan interface{})
-
-		s.JobChan <- Job{
-			Type:    "SEND_LOCAL_TX",
-			Data:    req,
-			ResChan: resChan,
-		}
-
-		result := <-resChan
-
-		if err, ok := result.(error); ok {
-			sendError(w, err.Error(), http.StatusBadRequest)
-			return
-		}
-
-		response := map[string]string{
-			"status":  "success",
-			"message": "Transazione validata, firmata e inviata al Central Node",
-			"tx_id":   fmt.Sprintf("%x", result.([]byte)), // ID transazione
-		}
-		prettyPrint(w, response)
-	}
-}
-
 func receiveTxHandler(s *Server) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		var msg TxMessage
@@ -270,54 +454,41 @@ func getDataHandler(s *Server) http.HandlerFunc {
 	}
 }
 
-func activateMineHandler(s *Server) http.HandlerFunc {
+func getUTXOSetHandler(s *Server) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		resChan := make(chan MineResponse)
+		resChan := make(chan any)
 
 		s.JobChan <- Job{
-			Type: "ACTIVATE_MINE",
-			Data: resChan,
+			Type:    "GET_UTXO_SET",
+			Data:    nil,
+			ResChan: resChan,
 		}
 
-		response := <-resChan
+		rawResponse := <-resChan
+
+		if err, ok := rawResponse.(error); ok {
+			sendError(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+
+		response := rawResponse.(UTXOSetResponse)
 
 		w.Header().Set("Content-Type", "application/json")
 		prettyPrint(w, response)
 	}
 }
 
-func getBalanceHandler(s *Server) http.HandlerFunc {
-	return func(w http.ResponseWriter, r *http.Request) {
-		address := r.URL.Query().Get("address")
-		if address == "" {
-			sendError(w, "Parametro 'address' mancante", http.StatusBadRequest)
-			return
-		}
+// Funzioni Helper
 
-		resChan := make(chan interface{})
-
-		s.JobChan <- Job{
-			Type:    "GET_BALANCE",
-			Data:    address,
-			ResChan: resChan,
-		}
-
-		result := <-resChan
-
-		if err, ok := result.(error); ok {
-			sendError(w, err.Error(), http.StatusInternalServerError)
-			return
-		}
-
-		response := map[string]interface{}{
-			"status":  "success",
-			"address": address,
-			"balance": result.(int),
-		}
-		prettyPrint(w, response)
+func sendError(w http.ResponseWriter, message string, code int) {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(code)
+	response := map[string]string{
+		"status": "error",
+		"detail": message,
 	}
+	prettyPrint(w, response)
 }
-
 func prettyPrint(w http.ResponseWriter, v any) {
 	encoder := json.NewEncoder(w)
 	encoder.SetIndent("", "    ")

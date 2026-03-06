@@ -1,0 +1,299 @@
+{
+  "info": {
+    "_postman_id": "0f04d56b-6d79-4ef4-ae3a-ac6306ee87df",
+    "name": "APL-Blockchain",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+    "_exporter_id": "50269869",
+    "_collection_link": "https://go.postman.co/collection/50269869-0f04d56b-6d79-4ef4-ae3a-ac6306ee87df?source=collection_link"
+  },
+  "item": [
+    {
+      "name": "Health",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "http://localhost:8080/api/health",
+          "protocol": "http",
+          "host": [
+            "localhost"
+          ],
+          "port": "8080",
+          "path": [
+            "api",
+            "health"
+          ]
+        }
+      },
+      "response": []
+    },
+    {
+      "name": "create-address",
+      "request": {
+        "method": "POST",
+        "header": [],
+        "url": {
+          "raw": "http://localhost:8080/api/create-address",
+          "protocol": "http",
+          "host": [
+            "localhost"
+          ],
+          "port": "8080",
+          "path": [
+            "api",
+            "create-address"
+          ]
+        }
+      },
+      "response": []
+    },
+    {
+      "name": "get-addresses",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "http://localhost:8080/api/get-addresses",
+          "protocol": "http",
+          "host": [
+            "localhost"
+          ],
+          "port": "8080",
+          "path": [
+            "api",
+            "get-addresses"
+          ]
+        }
+      },
+      "response": []
+    },
+    {
+      "name": "tx",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json",
+            "type": "text"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\r\n    \"from\": \"1EX9w23VrUL88fSzYeodQ2oUStC5suz36T\",\r\n    \"to\": \"1NLQHitvUS3QN8jeCHE7wZXZ3o9nuEkHC3\",\r\n    \"amount\": 2\r\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        },
+        "url": {
+          "raw": "http://localhost:8080/api/tx",
+          "protocol": "http",
+          "host": [
+            "localhost"
+          ],
+          "port": "8080",
+          "path": [
+            "api",
+            "tx"
+          ]
+        }
+      },
+      "response": []
+    },
+    {
+      "name": "get-balance",
+      "protocolProfileBehavior": {
+        "disableBodyPruning": true
+      },
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json",
+            "type": "text"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        },
+        "url": {
+          "raw": "http://localhost:8080/api/get-balance?address=1EX9w23VrUL88fSzYeodQ2oUStC5suz36T",
+          "protocol": "http",
+          "host": [
+            "localhost"
+          ],
+          "port": "8080",
+          "path": [
+            "api",
+            "get-balance"
+          ],
+          "query": [
+            {
+              "key": "address",
+              "value": "1EX9w23VrUL88fSzYeodQ2oUStC5suz36T",
+              "type": "text"
+            }
+          ]
+        }
+      },
+      "response": []
+    },
+    {
+      "name": "get-peers",
+      "protocolProfileBehavior": {
+        "disableBodyPruning": true
+      },
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json",
+            "type": "text"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\r\n    \"address\": \"1EX9w23VrUL88fSzYeodQ2oUStC5suz36T\"\r\n}"
+        },
+        "url": {
+          "raw": "http://localhost:8080/api/get-peers",
+          "protocol": "http",
+          "host": [
+            "localhost"
+          ],
+          "port": "8080",
+          "path": [
+            "api",
+            "get-peers"
+          ]
+        }
+      },
+      "response": []
+    },
+    {
+      "name": "get-mempool",
+      "protocolProfileBehavior": {
+        "disableBodyPruning": true
+      },
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json",
+            "type": "text"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\r\n    \"address\": \"1EX9w23VrUL88fSzYeodQ2oUStC5suz36T\"\r\n}"
+        },
+        "url": {
+          "raw": "http://localhost:8080/api/get-mempool",
+          "protocol": "http",
+          "host": [
+            "localhost"
+          ],
+          "port": "8080",
+          "path": [
+            "api",
+            "get-mempool"
+          ]
+        }
+      },
+      "response": []
+    },
+    {
+      "name": "print-blockchain",
+      "protocolProfileBehavior": {
+        "disableBodyPruning": true
+      },
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json",
+            "type": "text"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\r\n    \"address\": \"1EX9w23VrUL88fSzYeodQ2oUStC5suz36T\"\r\n}"
+        },
+        "url": {
+          "raw": "http://localhost:8080/api/print-blockchain",
+          "protocol": "http",
+          "host": [
+            "localhost"
+          ],
+          "port": "8080",
+          "path": [
+            "api",
+            "print-blockchain"
+          ]
+        }
+      },
+      "response": []
+    },
+    {
+      "name": "print-utxoset",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "http://localhost:8080/api/print-utxoset",
+          "protocol": "http",
+          "host": [
+            "localhost"
+          ],
+          "port": "8080",
+          "path": [
+            "api",
+            "print-utxoset"
+          ]
+        }
+      },
+      "response": []
+    },
+    {
+      "name": "mine",
+      "request": {
+        "method": "POST",
+        "header": [],
+        "body": {
+          "mode": "raw",
+          "raw": "{\r\n    \"address\": \"1M9YTwMfrHW3utYPSiAZjubMmk725vbfNi\"\r\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        },
+        "url": {
+          "raw": "http://localhost:8081/api/mine",
+          "protocol": "http",
+          "host": [
+            "localhost"
+          ],
+          "port": "8081",
+          "path": [
+            "api",
+            "mine"
+          ]
+        }
+      },
+      "response": []
+    }
+  ]
+}

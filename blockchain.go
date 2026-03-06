@@ -34,7 +34,7 @@ func NewBlockchainWithGB(address string, s Storage) (*Blockchain, error) {
 	bc := &Blockchain{storage: s}
 
 	if len(lastHash) == 0 {
-		fmt.Println("Nessuna blockchain trovata. Generazione Genesis Block ...")
+		fmt.Printf("Nessuna blockchain trovata. Generazione Genesis Block con l'address: %s\n", address)
 
 		genesis, err := bc.MineNewBlock(address, "", []*Transaction{})
 		if err != nil {
@@ -46,7 +46,7 @@ func NewBlockchainWithGB(address string, s Storage) (*Blockchain, error) {
 		}
 
 	} else {
-		fmt.Printf("Blockchain caricata. Ultimo hash: %x\n", lastHash)
+		fmt.Printf("Blockchain caricata.\n")
 		bc.tip = lastHash
 	}
 
@@ -91,23 +91,24 @@ func (bc *Blockchain) AddBlockToChain(block *Block) error {
 	return nil
 }
 
-// Stampa la blockchain
-func (bc *Blockchain) PrintBlockchain() error {
+// Restituisce la blockchain come []string
+func (bc *Blockchain) GetBlockchain() ([]string, error) {
+	var chain []string
 	it := bc.Iterator()
 
 	for {
 		block, err := it.Next()
 		if err != nil {
-			return fmt.Errorf("errore durante la stampa: %w", err)
+			return nil, fmt.Errorf("errore durante la stampa: %w", err)
 		}
 
-		fmt.Println(block)
+		chain = append(chain, block.String())
 
 		if len(block.PrevBlockHash) == 0 {
 			break
 		}
 	}
-	return nil
+	return chain, nil
 }
 
 // Restituisce una transazione dato l'ID

@@ -88,7 +88,7 @@ func (s *BoltStorage) SaveBlock(block *Block) error {
 	})
 }
 
-// Restituisce un blocco dato l'hash
+// Restituisce un blocco dato l'hash. Se non esiste restituisce nil.
 func (s *BoltStorage) GetBlock(hash []byte) (*Block, error) {
 	var val []byte
 	// View entra in sola lettura
@@ -98,7 +98,7 @@ func (s *BoltStorage) GetBlock(hash []byte) (*Block, error) {
 		return nil
 	})
 	if err != nil || val == nil {
-		return &Block{}, err
+		return nil, err
 	}
 
 	return deserialize[*Block](val)
@@ -127,7 +127,7 @@ func (s *BoltStorage) GetCandidateBlock(hash []byte) (*Block, error) {
 	})
 
 	if err != nil || val == nil {
-		return &Block{}, err
+		return nil, err
 	}
 
 	return deserialize[*Block](val)
@@ -221,6 +221,34 @@ func (s *BoltStorage) CheckUTXO(txID []byte, index int) (bool, error) {
 	})
 
 	return exists, err
+}
+
+// Restituisce tutti gli UTXO presenti nel database.
+func (s *BoltStorage) GetUTXOSet() ([]UTXO, error) {
+	var utxos []UTXO
+
+	err := s.db.View(func(tx *bbolt.Tx) error {
+		b := tx.Bucket(utxoBucket)
+		c := b.Cursor()
+
+		for k, v := c.First(); k != nil; k, v = c.Next() {
+			out, _ := deserialize[TXOutput](v)
+
+			txID := make([]byte, 32)
+			copy(txID, k[:32])
+			index := int(binary.BigEndian.Uint32(k[32:]))
+
+			utxo := UTXO{
+				TxID:     txID,
+				Index:    index,
+				TXOutput: out,
+			}
+			utxos = append(utxos, utxo)
+		}
+		return nil
+	})
+
+	return utxos, err
 }
 
 // Aggiorna utxobucket dopo l'aggiunta di un nuovo blocco nella blockchain

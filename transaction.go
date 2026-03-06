@@ -196,7 +196,7 @@ func (tx *Transaction) VerifySignature(prevTXs map[string]Transaction) (bool, er
 			return false, fmt.Errorf("verifica di validità della firma fallita")
 		}
 	}
-	fmt.Printf("Transazione %s: Verificata con successo", hex.EncodeToString(tx.ID))
+	fmt.Printf("Transazione %s: Verificata con successo\n", hex.EncodeToString(tx.ID))
 	return true, nil
 }
 
