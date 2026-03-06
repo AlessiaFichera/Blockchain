@@ -529,6 +529,10 @@ func (s *Server) handleGetBlocks(msg GetBlocksMessage) {
 		}
 
 		blocksToSend = append(blocksToSend, block)
+
+		if len(block.PrevBlockHash) == 0 {
+			break
+		}
 	}
 
 	// Inversione ordine

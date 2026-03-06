@@ -10,7 +10,7 @@ func (bc *Blockchain) Iterator() *BlockchainIterator {
 	return &BlockchainIterator{bc.tip, bc.storage}
 }
 
-// Dato un blocco restituisce il precedente nella catena
+// Restituisce il blocco precedente nella catena
 func (i *BlockchainIterator) Next() (*Block, error) {
 	block, err := i.storage.GetBlock(i.currentHash)
 	if err != nil {
