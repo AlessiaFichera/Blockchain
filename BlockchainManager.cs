@@ -2,6 +2,8 @@ using System;
 using System.Collections.Generic;
 using System.Text.Json;
 using System.Diagnostics;
+using System.Net.Http; 
+using System.Threading.Tasks;
 
 namespace Blockchain.Core
 {
@@ -158,34 +160,34 @@ namespace Blockchain.Core
             catch (Exception) { return new List<Analitica>(); }
         }
 
-        public List<WalletAccount> EstraiListaWallet(string jsonRicevuto)
+       // Nel file BlockchainManager.cs
+public async Task<(List<string> Lista, int Totale)> EstraiListaWallet() 
+{
+    using HttpClient client = new HttpClient();
+    try
+    {
+        // Assicurati che l'URL sia corretto per il tuo server
+        var response = await client.GetAsync("http://localhost:8080/api/get-addresses");
+        response.EnsureSuccessStatusCode();
+
+        string jsonRicevuto = await response.Content.ReadAsStringAsync();
+
+        var options = new JsonSerializerOptions { PropertyNameCaseInsensitive = true };
+        var dati = JsonSerializer.Deserialize<WalletRoot>(jsonRicevuto, options);
+
+        if (dati?.Addresses == null)
         {
-            try
-            {
-                var options = new JsonSerializerOptions { PropertyNameCaseInsensitive = true };
-                var root = JsonSerializer.Deserialize<WalletRoot>(jsonRicevuto, options);
-
-                if (root == null || root.Accounts == null)
-                {
-                    return new List<WalletAccount>();
-                }
-
-                var listaWallet = new List<WalletAccount>();
-                foreach (var acc in root.Accounts)
-                {
-                    listaWallet.Add(new WalletAccount
-                    {
-                        Address = acc.Address ?? "Indirizzo non trovato"
-                    });
-                }
-                return listaWallet;
-            }
-            catch (Exception ex)
-            {
-                Console.WriteLine($"Errore caricamento Wallet: {ex.Message}");
-                return new List<WalletAccount>();
-            }
+            return (new List<string>(), 0);
         }
+
+        return (dati.Addresses, dati.Count);
+    }
+    catch (Exception ex)
+    {
+        Console.WriteLine($"Errore: {ex.Message}");
+        return (new List<string>(), 0);
+    }
+}
 
         public List<TransactionData> EstraiListaTransazioni(string jsonRicevuto)
         {
@@ -248,6 +250,30 @@ namespace Blockchain.Core
                 return new List<Utxo>();
             }
         }
+        // Esempio di collegamento a una funzione esistente
+
+public async Task<string> CreateAddressAsync()
+{
+    using HttpClient client = new HttpClient();
+    try 
+    {
+        var response = await client.GetAsync("http://localhost:8080/api/create-address");
+        response.EnsureSuccessStatusCode(); 
+        
+        string jsonContenuto = await response.Content.ReadAsStringAsync();
+
+        // Trasformiamo il JSON in un oggetto C# (Type Safety)
+        var opzioni = new JsonSerializerOptions { PropertyNameCaseInsensitive = true };
+        var dati = JsonSerializer.Deserialize<WalletAccount>(jsonContenuto, opzioni);
+
+        // Restituiamo solo l'indirizzo pulito, non tutto il JSON
+        return dati?.Address ?? "Indirizzo non trovato";
+    }
+    catch (Exception ex)
+    {
+        return "Errore: " + ex.Message;
+    }
+}
     }
 
 }

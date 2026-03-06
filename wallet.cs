@@ -4,7 +4,8 @@ namespace Blockchain.Core
 {
     public class WalletRoot
     {   
-        public List<WalletAccount>? Accounts { get; set; }
+        public List<string>? Addresses { get; set; }
+        public int Count { get; set; }
     }
 
     public class WalletAccount

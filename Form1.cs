@@ -26,6 +26,7 @@ namespace Blockchain
             btnInviaTransazione.Click += BtnInviaTransazione_Click;
             btnAnalitiche.Click += BtnAnalitiche_Click;
             btnUTXOSet.Click += BtnUTXOSet_Click;
+            btncreaindirizzo.Click += btncreaindirizzo_Click;
         }
 
         // --- HANDLER EVENTI ---
@@ -71,28 +72,26 @@ namespace Blockchain
             }
         }
 
-        private void BtnAggiungiWallet_Click(object? sender, EventArgs e)
-        {
-            EntraInModalitaDettaglio("WALLET");
-            string nomeFile = "wallet.json";
+       private async void BtnAggiungiWallet_Click(object? sender, EventArgs e)
+{
+    EntraInModalitaDettaglio("WALLET");
 
-            if (File.Exists(nomeFile))
-            {
-                try
-                {
-                    string contenutoJson = File.ReadAllText(nomeFile);
-                    CaricaWalletGrafici(contenutoJson);
-                }
-                catch (Exception ex)
-                {
-                    MessageBox.Show($"Errore di runtime: {ex.Message}");
-                }
-            }
-            else
-            {
-                MessageBox.Show("Il file wallet.json non è stato trovato.");
-            }
-        }
+    try
+    {
+        // Riceviamo la tupla (Lista e Conteggio) dal manager
+        var (listaWallet, totale) = await _blockchainManager.EstraiListaWallet();
+
+
+        // Passiamo la lista al metodo che gestisce la parte grafica
+        CaricaWalletGrafici(listaWallet, totale);
+    }
+    catch (Exception ex)
+    {
+        MessageBox.Show($"Errore di runtime: {ex.Message}");
+    }
+}
+        
+
 
         private void BtnInviaTransazione_Click(object? sender, EventArgs e)
         {
@@ -134,6 +133,26 @@ namespace Blockchain
             }
         }
 
+        private async void btncreaindirizzo_Click(object? sender, EventArgs e)
+{
+    // Cambiamo temporaneamente il titolo per dare feedback all'utente
+     EntraInModalitaDettaglio("CREAINDIRIZZO");
+
+    try 
+    {
+        // CHIAMATA AL COLLEGAMENTO: aspettiamo che il Manager finisca
+        // senza bloccare l'interfaccia grafica
+        string nuovoIndirizzo = await _blockchainManager.CreateAddressAsync();
+
+        // Visualizziamo il risultato che arriva dalla tua funzione esterna
+            VisualizzaNuovoIndirizzo(nuovoIndirizzo);
+    }
+    catch (Exception ex)
+    {
+        MessageBox.Show("Errore nel collegamento: " + ex.Message);
+    }
+}
+
         // --- LOGICA UI E GRAFICA ---
 
         private void EntraInModalitaDettaglio(string modalita)
@@ -143,12 +162,14 @@ namespace Blockchain
             btnVisualizzaBlockchain.Dock = DockStyle.Top;
             btnAnalitiche.Dock = DockStyle.Top;
             btnUTXOSet.Dock = DockStyle.Top;
+            btncreaindirizzo.Dock = DockStyle.Top;
 
             pnlDettaglio.Controls.Add(btnAggiungiWallet);
             pnlDettaglio.Controls.Add(btnInviaTransazione);
             pnlDettaglio.Controls.Add(btnVisualizzaBlockchain);
             pnlDettaglio.Controls.Add(btnAnalitiche);
             pnlDettaglio.Controls.Add(btnUTXOSet);
+            pnlDettaglio.Controls.Add(btncreaindirizzo);
 
             pnlDettaglio.Visible = true;
             pnlHeaderDettaglio.Visible = true;
@@ -343,48 +364,60 @@ namespace Blockchain
             }
         }
 
-        private void CaricaWalletGrafici(string jsonContenuto)
+        private void CaricaWalletGrafici(List<string> walletList, int count)
+{
+    pnlContainer.Controls.Clear();
+    pnlContainer.AutoScroll = true;
+    pnlContainer.BackColor = Color.FromArgb(30, 33, 40);
+    
+    Label lblTitolo = new Label
+    {
+        Text = $"Wallet Disponibili: {count}",
+        Font = new Font("Segoe UI", 14, FontStyle.Bold),
+        ForeColor = Color.White,
+        Location = new Point(20, 15),
+        AutoSize = true
+    };
+    pnlContainer.Controls.Add(lblTitolo);
+
+    int coordinataY = 60; 
+
+    foreach (var wallet in walletList)
+    {
+        Panel walletCard = new Panel
         {
-            pnlContainer.Controls.Clear();
-            pnlContainer.AutoScroll = true;
-            int coordinataY = 20;
+            Size = new Size(pnlContainer.Width - 60, 80),
+            BackColor = Color.FromArgb(45, 50, 60), 
+            Location = new Point(20, coordinataY),
+            Padding = new Padding(10)
+        };
 
-            var walletList = _blockchainManager.EstraiListaWallet(jsonContenuto);
+        Label lblTag = new Label
+        {
+            Text = "WALLET",
+            Font = new Font("Segoe UI", 7, FontStyle.Bold),
+            ForeColor = Color.FromArgb(0, 122, 204),
+            Location = new Point(15, 12),
+            AutoSize = true
+        };
 
-            foreach (var wallet in walletList)
-            {
-                Panel walletCard = new Panel
-                {
-                    Size = new Size(300, 80),
-                    BackColor = Color.White,
-                    BorderStyle = BorderStyle.FixedSingle,
-                    Location = new Point(20, coordinataY)
-                };
-                Label lblWallet = new Label
-                {
-                    Text = "WALLET:",
-                    Font = new Font("Consolas", 9, FontStyle.Bold),
-                    Location = new Point(10, 15),
-                    Size = new Size(430, 15),
-                    ForeColor = Color.FromArgb(24, 28, 36)
-                };
+        Label lblAddress = new Label
+        {
+            Text = wallet ?? "N/D",
+            ForeColor = Color.White,
+            Font = new Font("Consolas", 10), 
+            Location = new Point(15, 35),
+            Size = new Size(walletCard.Width - 30, 30),
+            TextAlign = ContentAlignment.MiddleLeft
+        };
 
-                Label lblAddress = new Label
-                {
-                    Text = "Indirizzo: " + wallet.Address,
-                    ForeColor = Color.FromArgb(45, 45, 45),
-                    Location = new Point(10, 35),
-                    Size = new Size(280, 40),
-                    TextAlign = ContentAlignment.MiddleLeft,
-                    Font = new Font("Segoe UI", 9, FontStyle.Bold)
-                };
+        walletCard.Controls.Add(lblTag);
+        walletCard.Controls.Add(lblAddress);
+        pnlContainer.Controls.Add(walletCard);
 
-                walletCard.Controls.Add(lblWallet);
-                walletCard.Controls.Add(lblAddress);
-                pnlContainer.Controls.Add(walletCard);
-                coordinataY += 100;
-            }
-        }
+        coordinataY += 95; 
+    }
+}
 
         private void CaricaTransazioniGrafiche(string jsonContenuto)
         {
@@ -509,5 +542,47 @@ namespace Blockchain
                 coordinataY += 180;
             }
         }
+        private void VisualizzaNuovoIndirizzo(string indirizzo)
+{
+    // Pulizia e preparazione del contenitore come in CaricaWalletGrafici
+    pnlContainer.Controls.Clear();
+    pnlContainer.AutoScroll = true;
+
+    // Creazione della "Card" per il nuovo indirizzo (Software Robusto)
+    Panel addressCard = new Panel
+    {
+        Size = new Size(400, 100),
+        BackColor = Color.White,
+        BorderStyle = BorderStyle.FixedSingle,
+        Location = new Point(20, 20) // Posizionato in alto nel pannello
+    };
+
+    Label lblHeader = new Label
+    {
+        Text = "✨ NUOVO INDIRIZZO GENERATO",
+        Font = new Font("Segoe UI", 10, FontStyle.Bold),
+        ForeColor = Color.White,
+        BackColor = Color.FromArgb(0, 120, 215), // Colore coerente con i bottoni
+        Dock = DockStyle.Top,
+        Height = 30,
+        TextAlign = ContentAlignment.MiddleCenter
+    };
+
+    Label lblAddress = new Label
+    {
+        Text = indirizzo,
+        ForeColor = Color.FromArgb(45, 45, 45),
+        Font = new Font("Consolas", 11, FontStyle.Bold),
+        Location = new Point(10, 45),
+        Size = new Size(380, 40),
+        TextAlign = ContentAlignment.MiddleCenter
+    };
+
+    // Composizione dei componenti (Orientamento ai componenti)
+    addressCard.Controls.Add(lblAddress);
+    addressCard.Controls.Add(lblHeader);
+    
+    pnlContainer.Controls.Add(addressCard);
+}
     }
 }
