@@ -20,6 +20,11 @@ namespace Blockchain
             // Inizializzazione della logica
             _blockchainManager = new BlockchainManager();
 
+            btnNode1.Click += Nodo_Click;
+            btnNode2.Click += Nodo_Click;
+            btnNode3.Click += Nodo_Click;
+            btnNode4.Click += Nodo_Click;
+
             // 2. Gestione Eventi Standard
             btnVisualizzaBlockchain.Click += BtnVisualizzaBlockchain_Click;
             btnAggiungiWallet.Click += BtnAggiungiWallet_Click;
@@ -30,10 +35,22 @@ namespace Blockchain
         }
 
         // --- HANDLER EVENTI ---
+        private async void Nodo_Click(object? sender, EventArgs e)
+{
+    if (sender is Button btn && btn.Tag != null)
+    {
+        string portaScelta = btn.Tag.ToString()!;
+        
+        // 1. Impostiamo la porta
+        _blockchainManager.PortaCorrente = portaScelta;
+        EntraNelNodo(portaScelta);
+
+    }
+}
 
         private async void BtnVisualizzaBlockchain_Click(object? sender, EventArgs e)
         {
-            EntraInModalitaDettaglio("BLOCKCHAIN");
+             PreparaAreaLavoro("BLOCKCHAIN");
 
     try
     {
@@ -58,7 +75,7 @@ namespace Blockchain
             if (File.Exists(nomeFile))
             {
                 string contenutoJson = File.ReadAllText(nomeFile);
-                EntraInModalitaDettaglio("ANALITICHE");
+                 PreparaAreaLavoro("ANALITICHE");
                 VisualizzaStatistiche(contenutoJson);
             }
             else
@@ -69,7 +86,7 @@ namespace Blockchain
 
        private async void BtnAggiungiWallet_Click(object? sender, EventArgs e)
 {
-    EntraInModalitaDettaglio("WALLET");
+     PreparaAreaLavoro("WALLET");
 
     try
     {
@@ -90,7 +107,7 @@ namespace Blockchain
 
         private void BtnInviaTransazione_Click(object? sender, EventArgs e)
         {
-            EntraInModalitaDettaglio("TRANSAZIONE");
+             PreparaAreaLavoro("TRANSAZIONE");
             string nomeFile = "transazioni.json";
 
             if (File.Exists(nomeFile))
@@ -114,7 +131,7 @@ namespace Blockchain
         private async void BtnUTXOSet_Click(object? sender, EventArgs e)
         {
             _blockchainManager.EseguiAggiornamentoPython();
-             EntraInModalitaDettaglio("UTXOSET");
+              PreparaAreaLavoro("UTXOSET");
             try
             {
                  var (count, utxoSet)  = await _blockchainManager.EstraiUTXOSet();
@@ -130,7 +147,7 @@ namespace Blockchain
         private async void btncreaindirizzo_Click(object? sender, EventArgs e)
 {
     // Cambiamo temporaneamente il titolo per dare feedback all'utente
-     EntraInModalitaDettaglio("CREAINDIRIZZO");
+     PreparaAreaLavoro("CREAINDIRIZZO");
 
     try 
     {
@@ -147,32 +164,77 @@ namespace Blockchain
 }
 
         // --- LOGICA UI E GRAFICA ---
+    
+private void EntraNelNodo(string porta)
+{
+    _blockchainManager.PortaCorrente = porta;
 
-        private void EntraInModalitaDettaglio(string modalita)
-        {
-            btnAggiungiWallet.Dock = DockStyle.Top;
-            btnInviaTransazione.Dock = DockStyle.Top;
-            btnVisualizzaBlockchain.Dock = DockStyle.Top;
-            btnAnalitiche.Dock = DockStyle.Top;
-            btnUTXOSet.Dock = DockStyle.Top;
-            btncreaindirizzo.Dock = DockStyle.Top;
+    pnlLogin.Visible = false;
+    pnlDettaglio.Visible = true;
+    pnlHeaderDettaglio.Visible = true;
+    pnlContainer.Visible = true;
 
-            pnlDettaglio.Controls.Add(btnAggiungiWallet);
-            pnlDettaglio.Controls.Add(btnInviaTransazione);
-            pnlDettaglio.Controls.Add(btnVisualizzaBlockchain);
-            pnlDettaglio.Controls.Add(btnAnalitiche);
-            pnlDettaglio.Controls.Add(btnUTXOSet);
-            pnlDettaglio.Controls.Add(btncreaindirizzo);
+    ConfiguraMenuNavigazione(porta);
 
-            pnlDettaglio.Visible = true;
-            pnlHeaderDettaglio.Visible = true;
+    lblTitle.Text = $"ACCOUNT ATTIVO: NODO {porta} - SELEZIONA FUNZIONE";
+    lblTitle.Location = new Point(200, 20);
 
-            lblTitle.Visible = true;
-            lblTitle.Parent = pnlHeaderDettaglio;
-            lblTitle.Location = new Point(250, 10);
-            lblTitle.BringToFront();
-        }
+}
+private void PreparaAreaLavoro(string nomeOperazione)
+{
+    
+    pnlContainer.Controls.Clear();
+    lblTitle.Text = $"{nomeOperazione} - NODO {_blockchainManager.PortaCorrente}";
+    lblTitle.Location = new Point(370, 20);
+}
 
+private void ConfiguraMenuNavigazione(string porta)
+{
+    pnlDettaglio.Controls.Clear();
+
+    AggiungiBottoneAlMenu(btncreaindirizzo);
+    AggiungiBottoneAlMenu(btnUTXOSet);
+    AggiungiBottoneAlMenu(btnAnalitiche);
+    AggiungiBottoneAlMenu(btnVisualizzaBlockchain);
+    AggiungiBottoneAlMenu(btnInviaTransazione);
+    AggiungiBottoneAlMenu(btnAggiungiWallet);
+    
+    StilizzaBottoneNav(btnHome, "🏠 HOME", Color.FromArgb(45, 45, 48));
+    btnHome.Click += BtnHome_Click;
+    AggiungiBottoneAlMenu(btnHome);
+}
+
+private void AggiungiBottoneAlMenu(Button btn)
+{
+    btn.Dock = DockStyle.Top;
+    btn.Height = 50;
+    btn.FlatStyle = FlatStyle.Flat;
+    btn.FlatAppearance.BorderSize = 0;
+    btn.ForeColor = Color.White;
+    btn.Font = new Font("Segoe UI", 10, FontStyle.Bold);
+    pnlDettaglio.Controls.Add(btn);
+}
+private void StilizzaBottoneNav(Button btn, string testo, Color colore)
+{
+    btn.Text = testo;
+    btn.BackColor = colore;
+    btn.Cursor = Cursors.Hand;
+}
+
+// Handler per il bottone Home: torna alla schermata di selezione nodi
+private void BtnHome_Click(object? sender, EventArgs e)
+{
+    _blockchainManager.PortaCorrente = null; 
+    
+    pnlLogin.Visible = true;
+    pnlDettaglio.Visible = false;
+    pnlHeaderDettaglio.Visible = false;
+    pnlContainer.Visible = false;
+    pnlContainer.Controls.Clear();
+}
+   
+       
+// Metodo per visualizzare il nuovo indirizzo creato
         private void CaricaBlocchiGrafici(List<Blocks> catena)
         {
             pnlContainer.Controls.Clear();

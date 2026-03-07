@@ -1,30 +1,34 @@
 ﻿namespace Blockchain;
+
 partial class Form1
 {
-    /// <summary>
-    ///  Required designer variable.
-    /// </summary>
-    private Panel pnlDettaglio;
-    private Panel pnlContainer;
-    private Panel pnlHeaderDettaglio;
+    private System.ComponentModel.IContainer components = null;
+
+    // Pannelli principali
+    private Panel pnlDettaglio;        
+    private Panel pnlContainer;        
+    private Panel pnlHeaderDettaglio;  
+    private Panel pnlLogin;           
+    // Elementi UI
     private Label lblTitle;
+    private Label lblSeleziona;
+    private PictureBox picGrafico;
+
+    // Bottoni Funzionalità (Dashboard)
     private Button btnAggiungiWallet;
     private Button btnInviaTransazione;
-    private Button btnVisualizzaBlockchain; 
+    private Button btnVisualizzaBlockchain;
     private Button btnAnalitiche;
-
-    private PictureBox picGrafico;
     private Button btnUTXOSet;
     private Button btncreaindirizzo;
-    
 
+    // Bottoni Selezione Account (Login)
+    private Button btnNode1;
+    private Button btnNode2;
+    private Button btnNode3;
+    private Button btnNode4;
+    private Button btnHome;
 
-     private System.ComponentModel.IContainer components = null;
-    
-    /// <summary>
-    ///  Clean up any resources being used.
-    /// </summary>
-    /// <param name="disposing">true if managed resources should be disposed; otherwise, false.</param>
     protected override void Dispose(bool disposing)
     {
         if (disposing && (components != null))
@@ -36,81 +40,108 @@ partial class Form1
 
     #region Windows Form Designer generated code
 
-    /// <summary>
-    ///  Required method for Designer support - do not modify
-    ///  the contents of this method with the code editor.
-    /// </summary>
     private void InitializeComponent()
     {
+        // Inizializzazione controlli
         pnlDettaglio = new Panel();
         pnlContainer = new Panel();
         pnlHeaderDettaglio = new Panel();
+        pnlLogin = new Panel();
         lblTitle = new Label();
+        lblSeleziona = new Label();
+        picGrafico = new PictureBox();
+
         btnAggiungiWallet = new Button();
         btnInviaTransazione = new Button();
         btnVisualizzaBlockchain = new Button();
         btnAnalitiche = new Button();
         btnUTXOSet = new Button();
         btncreaindirizzo = new Button();
+
+        btnNode1 = new Button();
+        btnNode2 = new Button();
+        btnNode3 = new Button();
+        btnNode4 = new Button();
+        btnHome = new Button();
+
         // 
         // Form1
         // 
-        this.ClientSize = new Size(1000, 600); 
-        this.BackColor = Color.FromArgb(24, 28, 36); 
-        this.Text = "BlockchainHome";
-
-        //Grafico
-        this.picGrafico = new PictureBox();
-        this.picGrafico.Size = new Size(600, 400); 
-        this.picGrafico.Location = new Point(20, 200); 
-        this.picGrafico.SizeMode = PictureBoxSizeMode.Zoom; 
-        this.picGrafico.Visible = false;
-        this.pnlContainer.Controls.Add(this.picGrafico);
+        this.ClientSize = new Size(1000, 600);
+        this.BackColor = Color.FromArgb(24, 28, 36);
+        this.Text = "Blockchain Simulator";
+        this.StartPosition = FormStartPosition.CenterScreen;
 
         // 
-        // pnlDettaglio (Il menù a tendina laterale)
+        // 1. PANNELLO LOGIN (Schermata iniziale)
+        // 
+        pnlLogin.Dock = DockStyle.Fill;
+        pnlLogin.BackColor = Color.FromArgb(24, 28, 36);
+        
+        lblSeleziona.Text = "BENVENUTO, SELEZIONA IL TUO ACCOUNT NODO";
+        lblSeleziona.ForeColor = Color.White;
+        lblSeleziona.Font = new Font("Segoe UI", 16, FontStyle.Bold);
+        lblSeleziona.Location = new Point(230, 100);
+        lblSeleziona.AutoSize = true;
+
+        StilizzaBottoneLogin(btnNode1, "ACCEDI AL CENTRALNODE: 8080", 200);
+        StilizzaBottoneLogin(btnNode2, "ACCEDI AL NODO: 8081", 270);
+        StilizzaBottoneLogin(btnNode3, "ACCEDI AL NODO: 8082", 340);
+        StilizzaBottoneLogin(btnNode4, "ACCEDI AL NODO: 8083", 410);
+
+// Nel file Form1.Designer.cs (o dove crei i bottoni)
+        btnNode1.Tag = "8080";
+        btnNode2.Tag = "8081";
+        btnNode3.Tag = "8082";
+        btnNode4.Tag = "8083";
+
+        pnlLogin.Controls.Add(lblSeleziona);
+        pnlLogin.Controls.Add(btnNode1);
+        pnlLogin.Controls.Add(btnNode2);
+        pnlLogin.Controls.Add(btnNode3);
+        pnlLogin.Controls.Add(btnNode4);
+
+        // 
+        // 2. PANNELLI DASHBOARD (Inizialmente nascosti)
         // 
         pnlDettaglio.Dock = DockStyle.Left;
         pnlDettaglio.Width = 230;
         pnlDettaglio.BackColor = Color.FromArgb(32, 38, 50);
-        pnlDettaglio.Visible = false; 
+        pnlDettaglio.Visible = false;
 
-        // 
-        // pnlHeaderDettaglio (Header del menù laterale)
-        // 
         pnlHeaderDettaglio.Dock = DockStyle.Top;
         pnlHeaderDettaglio.Height = 70;
         pnlHeaderDettaglio.BackColor = Color.FromArgb(0, 80, 200);
         pnlHeaderDettaglio.Visible = false;
-        pnlHeaderDettaglio.Controls.Add(lblTitle);
-        // 
-        // pnlContainer (Dove caricheremo i blocchi o il wallet)
-        // 
+
         pnlContainer.Dock = DockStyle.Fill;
+        pnlContainer.Visible = false;
 
-        // 
-        // lblTitle
-        // 
-        lblTitle.Text = "🔒BENVENUTO NELLA BLOCKCHAIN";
+        lblTitle.Text = "🔒 BLOCKCHAIN MANAGER";
         lblTitle.ForeColor = Color.White;
-        lblTitle.Font = new Font("Segoe UI", 18, FontStyle.Bold);
-        lblTitle.Location = new Point(250, 50);
+        lblTitle.Font = new Font("Segoe UI", 14, FontStyle.Bold);
+        lblTitle.Location = new Point(10, 20);
         lblTitle.AutoSize = true;
-       
+        pnlHeaderDettaglio.Controls.Add(lblTitle);
 
-        // Stilizziamo i bottoni come "Card" per l'inizio
-        StilizzaBottone(btnAggiungiWallet, "Wallet Disponibili", 150);
-        StilizzaBottone(btnInviaTransazione, "Cronologia Transazioni", 220);
-        StilizzaBottone(btnVisualizzaBlockchain, "Visualizza Blockchain", 290);
-        StilizzaBottone(btnAnalitiche, "Analitiche", 360);
-        StilizzaBottone(btnUTXOSet, "UTXO Set", 430);
-        StilizzaBottone(btncreaindirizzo, "Crea Indirizzo", 500);
-    
-        // I bottoni delle azioni li aggiungiamo inizialmente al form centrale
-        this.Controls.Add(pnlContainer);
-        this.Controls.Add(pnlDettaglio);
-        this.Controls.Add(pnlHeaderDettaglio);
-        pnlContainer.Controls.Add(lblTitle);
+        // 
+        // 3. BOTTONI FUNZIONALI (Dashboard)
+        // 
+        StilizzaBottoneFunzione(btnAggiungiWallet, "Wallet Disponibili", 100);
+        StilizzaBottoneFunzione(btnInviaTransazione, "Cronologia Transazioni", 170);
+        StilizzaBottoneFunzione(btnVisualizzaBlockchain, "Visualizza Blockchain", 240);
+        StilizzaBottoneFunzione(btnAnalitiche, "Analitiche", 310);
+        StilizzaBottoneFunzione(btnUTXOSet, "UTXO Set", 380);
+        StilizzaBottoneFunzione(btncreaindirizzo, "Crea Indirizzo", 450);
+
+        // PictureBox per i grafici Python
+        picGrafico.Size = new Size(500, 350);
+        picGrafico.Location = new Point(20, 100);
+        picGrafico.SizeMode = PictureBoxSizeMode.Zoom;
+        picGrafico.Visible = false;
+        pnlContainer.Controls.Add(picGrafico);
+
+        // Aggiunta controlli al Container
         pnlContainer.Controls.Add(btnAggiungiWallet);
         pnlContainer.Controls.Add(btnInviaTransazione);
         pnlContainer.Controls.Add(btnVisualizzaBlockchain);
@@ -118,22 +149,38 @@ partial class Form1
         pnlContainer.Controls.Add(btnUTXOSet);
         pnlContainer.Controls.Add(btncreaindirizzo);
 
+        // Aggiunta pannelli principali al Form
+        this.Controls.Add(pnlLogin); // Il login è l'ultimo aggiunto sopra gli altri
+        this.Controls.Add(pnlContainer);
+        this.Controls.Add(pnlDettaglio);
+        this.Controls.Add(pnlHeaderDettaglio);
     }
 
-    private void StilizzaBottone(Button btn, string testo, int y)
+    private void StilizzaBottoneLogin(Button btn, string testo, int y)
+    {
+        btn.Text = testo;
+        btn.Size = new Size(350, 50);
+        btn.Location = new Point(325, y);
+        btn.FlatStyle = FlatStyle.Flat;
+        btn.BackColor = Color.FromArgb(0, 120, 215);
+        btn.ForeColor = Color.White;
+        btn.Font = new Font("Segoe UI", 12, FontStyle.Bold);
+        btn.Cursor = Cursors.Hand;
+        btn.FlatAppearance.BorderSize = 0;
+    }
+
+    private void StilizzaBottoneFunzione(Button btn, string testo, int y)
     {
         btn.Text = testo;
         btn.Size = new Size(250, 50);
-        btn.Location = new Point(380, y);
+        btn.Location = new Point(350, y); // Centrati nel container
         btn.FlatStyle = FlatStyle.Flat;
-        btn.FlatAppearance.BorderSize = 0;
-        btn.BackColor = Color.FromArgb(0, 120, 215);
+        btn.BackColor = Color.FromArgb(41, 171, 226);
         btn.ForeColor = Color.White;
-        btn.Font = new Font("Segoe UI", 11, FontStyle.Bold);
+        btn.Font = new Font("Segoe UI", 10, FontStyle.Bold);
         btn.Cursor = Cursors.Hand;
+        btn.FlatAppearance.BorderSize = 0;
     }
-    
 
     #endregion
 }
-

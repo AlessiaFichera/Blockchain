@@ -16,7 +16,7 @@ public class TransactionData
 public class TxInputData
 {
     public string? TxID { get; set; }
-    public int OutputIndex { get; set; }
+    public int vout_index { get; set; }
     public string? Signature { get; set; }
     public string? pub_key_hash { get; set; }
 }

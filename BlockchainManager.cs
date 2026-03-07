@@ -19,7 +19,29 @@ namespace Blockchain.Core
     {
         private List<Blocks> _chain;
 
-        // Evento di prima classe per notificare la UI
+        public string? PortaCorrente { get; set; }
+
+        // Helper per non ripetere l'URL in ogni funzione
+        private string BaseUrl => $"http://localhost:{PortaCorrente}/api";
+
+/*public async Task<bool> MinaBloccoAsync()
+{
+    using (var client = new HttpClient())
+    {
+        try 
+        {
+            // Chiamata all'endpoint di mining del nodo corrente
+            var response = await client.GetAsync($"{BaseUrl}/mine");
+            return response.IsSuccessStatusCode;
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Errore durante il mining: {ex.Message}");
+            return false;
+        }
+    }
+}*/
+        
         public event EventHandler<BlockAddedEventArgs>? BlockAdded;
 
         public BlockchainManager()
@@ -35,8 +57,8 @@ namespace Blockchain.Core
             {
                 try
                 {
-                    // Chiamata all'endpoint definito nel router Go
-                    string jsonRicevuto = await client.GetStringAsync("http://localhost:8080/api/print-blockchain");
+                    // Chiamata all'endpoint dinamico
+                    string jsonRicevuto = await client.GetStringAsync($"{BaseUrl}/print-blockchain");
 
                     var options = new JsonSerializerOptions { PropertyNameCaseInsensitive = true };
 
@@ -51,7 +73,6 @@ namespace Blockchain.Core
                         foreach (var b in root.Blocks)
                         {
                             _chain.Add(b);
-                            // Notifica dell'evento per aggiornare la grafica
                             OnBlockAdded(b);
                         }
                         return _chain;
@@ -60,7 +81,7 @@ namespace Blockchain.Core
                 }
                 catch (HttpRequestException ex)
                 {
-                    throw new Exception("Il nodo Go non risponde sulla porta 8080.", ex);
+                    throw new Exception($"Il nodo Go non risponde sulla porta {PortaCorrente}.", ex);
                 }
                 catch (JsonException ex)
                 {
@@ -73,23 +94,20 @@ namespace Blockchain.Core
         {
             BlockAdded?.Invoke(this, new BlockAddedEventArgs(block));
         }
+
         public void EseguiAggiornamentoPython()
         {
             try
             {
                 ProcessStartInfo start = new ProcessStartInfo();
-            
                 start.FileName = "python";
-
                 start.Arguments = "blockchain_analyzer.py";
-
-                // 3. Opzioni per l'esecuzione pulita
                 start.UseShellExecute = false;
                 start.CreateNoWindow = true; 
 
                 using (Process? process = Process.Start(start))
                 {
-                    process?.WaitForExit(); // Aspetta che Python finisca prima di proseguire
+                    process?.WaitForExit(); 
                 }
             }
             catch (Exception ex)
@@ -98,13 +116,10 @@ namespace Blockchain.Core
             }
         }
 
-    
-
         public List<Analitica> EstraiAnalitiche(string jsonRicevuto)
         {
             try
             {
-                // Deserializzazione (Type Safety)
                 var root = JsonSerializer.Deserialize<StatisticheRoot>(jsonRicevuto);
                 if (root == null || root.statistiche == null)
                 {
@@ -112,7 +127,6 @@ namespace Blockchain.Core
                 }
                 var d = root.statistiche;
 
-                // Creiamo una lista di componenti 
                 return new List<Analitica>
                 {
                     new Analitica { Titolo = "Mining Medio", Valore = d.tempo_medio_mining.ToString("F2") + "s" },
@@ -124,34 +138,32 @@ namespace Blockchain.Core
             catch (Exception) { return new List<Analitica>(); }
         }
 
-
-public async Task<(List<string> Lista, int Totale)> EstraiListaWallet() 
-{
-    using HttpClient client = new HttpClient();
-    try
-    {
-        
-        var response = await client.GetAsync("http://localhost:8080/api/get-addresses");
-        response.EnsureSuccessStatusCode();
-
-        string jsonRicevuto = await response.Content.ReadAsStringAsync();
-
-        var options = new JsonSerializerOptions { PropertyNameCaseInsensitive = true };
-        var dati = JsonSerializer.Deserialize<WalletRoot>(jsonRicevuto, options);
-
-        if (dati?.Addresses == null)
+        public async Task<(List<string> Lista, int Totale)> EstraiListaWallet() 
         {
-            return (new List<string>(), 0);
-        }
+            using HttpClient client = new HttpClient();
+            try
+            {
+                var response = await client.GetAsync($"{BaseUrl}/get-addresses");
+                response.EnsureSuccessStatusCode();
 
-        return (dati.Addresses, dati.Count);
-    }
-    catch (Exception ex)
-    {
-        Console.WriteLine($"Errore: {ex.Message}");
-        return (new List<string>(), 0);
-    }
-}
+                string jsonRicevuto = await response.Content.ReadAsStringAsync();
+
+                var options = new JsonSerializerOptions { PropertyNameCaseInsensitive = true };
+                var dati = JsonSerializer.Deserialize<WalletRoot>(jsonRicevuto, options);
+
+                if (dati?.Addresses == null)
+                {
+                    return (new List<string>(), 0);
+                }
+
+                return (dati.Addresses, dati.Count);
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Errore: {ex.Message}");
+                return (new List<string>(), 0);
+            }
+        }
 
         public List<TransactionData> EstraiListaTransazioni(string jsonRicevuto)
         {
@@ -185,85 +197,73 @@ public async Task<(List<string> Lista, int Totale)> EstraiListaWallet()
         }
 
         public async Task<(int count, List<Utxo> Utxos)> EstraiUTXOSet()
-{
-    using HttpClient client = new HttpClient();
-    try
-    {
-        // 1. Chiamata API
-        var response = await client.GetAsync("http://localhost:8080/api/print-utxoset");
-        response.EnsureSuccessStatusCode();
-
-        // 2. Lettura del contenuto
-        string jsonRicevuto = await response.Content.ReadAsStringAsync();
-
-        // 3. Deserializzazione (trasformo il testo in oggetti C#)
-        var options = new JsonSerializerOptions { PropertyNameCaseInsensitive = true };
-        var root = JsonSerializer.Deserialize<UtxoResponse>(jsonRicevuto, options);
-
-        // 4. Controllo se i dati ci sono
-        if (root?.Utxos == null)
         {
-            return (0, new List<Utxo>());
+            using HttpClient client = new HttpClient();
+            try
+            {
+                var response = await client.GetAsync($"{BaseUrl}/print-utxoset");
+                response.EnsureSuccessStatusCode();
+
+                string jsonRicevuto = await response.Content.ReadAsStringAsync();
+
+                var options = new JsonSerializerOptions { PropertyNameCaseInsensitive = true };
+                var root = JsonSerializer.Deserialize<UtxoResponse>(jsonRicevuto, options);
+
+                if (root?.Utxos == null)
+                {
+                    return (0, new List<Utxo>());
+                }
+
+                return (root.count, root.Utxos);
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Errore: {ex.Message}");
+                return (0, new List<Utxo>());
+            }
         }
 
-        // Restituisco direttamente i dati ottenuti
-        return (root.count, root.Utxos);
-    }
-    catch (Exception ex)
-    {
-        // Gestione errori semplice
-        Console.WriteLine($"Errore: {ex.Message}");
-        return (0, new List<Utxo>());
-    }
-}
-       
-
-public async Task<string> CreateAddressAsync()
-{
-    using HttpClient client = new HttpClient();
-    try 
-    {
-        var response = await client.GetAsync("http://localhost:8080/api/create-address");
-        response.EnsureSuccessStatusCode(); 
-        
-        string jsonContenuto = await response.Content.ReadAsStringAsync();
-
-        // Trasformiamo il JSON in un oggetto C# (Type Safety)
-        var opzioni = new JsonSerializerOptions { PropertyNameCaseInsensitive = true };
-        var dati = JsonSerializer.Deserialize<WalletAccount>(jsonContenuto, opzioni);
-
-        // Restituiamo solo l'indirizzo , non tutto il JSON
-        return dati?.Address ?? "Indirizzo non trovato";
-    }
-    catch (Exception ex)
-    {
-        return "Errore: " + ex.Message;
-    }
-}
-public async Task<bool> InviaTransazioneAsync(string mittente, string destinatario, int ammontare)
-{
-    using (var client = new HttpClient())
-    {
-        var transazione = new { from = mittente, to = destinatario, amount = ammontare };
-
-        try 
+        public async Task<string> CreateAddressAsync()
         {
-            string jsonBody = JsonSerializer.Serialize(transazione);
-            
-            // Correzione CS1503: Passiamo (stringa, codifica, mediaType)
-            var content = new StringContent(jsonBody, Encoding.UTF8, "application/json");
+            using HttpClient client = new HttpClient();
+            try 
+            {
+                var response = await client.GetAsync($"{BaseUrl}/create-address");
+                response.EnsureSuccessStatusCode(); 
+                
+                string jsonContenuto = await response.Content.ReadAsStringAsync();
 
-            var response = await client.PostAsync("http://localhost:8080/api/tx", content);
-            return response.IsSuccessStatusCode;
+                var opzioni = new JsonSerializerOptions { PropertyNameCaseInsensitive = true };
+                var dati = JsonSerializer.Deserialize<WalletAccount>(jsonContenuto, opzioni);
+
+                return dati?.Address ?? "Indirizzo non trovato";
+            }
+            catch (Exception ex)
+            {
+                return "Errore: " + ex.Message;
+            }
         }
-        catch (Exception ex)
+
+        public async Task<bool> InviaTransazioneAsync(string mittente, string destinatario, int ammontare)
         {
-            // Software robusto: gestione dell'eccezione in runtime
-            Console.WriteLine($"Errore: {ex.Message}");
-            return false;
+            using (var client = new HttpClient())
+            {
+                var transazione = new { from = mittente, to = destinatario, amount = ammontare };
+
+                try 
+                {
+                    string jsonBody = JsonSerializer.Serialize(transazione);
+                    var content = new StringContent(jsonBody, Encoding.UTF8, "application/json");
+
+                    var response = await client.PostAsync($"{BaseUrl}/tx", content);
+                    return response.IsSuccessStatusCode;
+                }
+                catch (Exception ex)
+                {
+                    Console.WriteLine($"Errore: {ex.Message}");
+                    return false;
+                }
+            }
         }
     }
-}
-    }
-
 }
