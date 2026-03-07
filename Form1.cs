@@ -31,29 +31,24 @@ namespace Blockchain
 
         // --- HANDLER EVENTI ---
 
-        private void BtnVisualizzaBlockchain_Click(object? sender, EventArgs e)
+        private async void BtnVisualizzaBlockchain_Click(object? sender, EventArgs e)
         {
             EntraInModalitaDettaglio("BLOCKCHAIN");
-            string nomeFile = "blockchain.json";
 
-            if (File.Exists(nomeFile))
-            {
-                try
-                {
-                    string contenutoJson = File.ReadAllText(nomeFile);
-                    _blockchainManager.RiceviBloccoDaGo(contenutoJson);
-                    CaricaBlocchiGrafici();
-                }
-                catch (Exception ex)
-                {
-                    MessageBox.Show($"Errore di runtime: {ex.Message}");
-                }
-            }
-            else
-            {
-                MessageBox.Show("Il file blockchain.json non è stato trovato.");
-            }
-        }
+    try
+    {
+        // Chiamata al metodo sincronizza
+       List<Blocks> blocchiRicevuti = await _blockchainManager.SincronizzaBlockchain();
+
+        // Aggiornamento della grafica con i nuovi blocchi
+        CaricaBlocchiGrafici(blocchiRicevuti);
+    }
+    catch (Exception ex)
+    {
+        MessageBox.Show(ex.Message, "Errore Sincronizzazione", MessageBoxButtons.OK, MessageBoxIcon.Error);
+    }
+}
+        
 
         private void BtnAnalitiche_Click(object? sender, EventArgs e)
         {
@@ -116,21 +111,20 @@ namespace Blockchain
             }
         }
 
-        private void BtnUTXOSet_Click(object? sender, EventArgs e)
+        private async void BtnUTXOSet_Click(object? sender, EventArgs e)
         {
             _blockchainManager.EseguiAggiornamentoPython();
-            string nomeFile = "utxoset.json";
-
-            if (File.Exists(nomeFile))
+             EntraInModalitaDettaglio("UTXOSET");
+            try
             {
-                string contenutoJson = File.ReadAllText(nomeFile);
-                EntraInModalitaDettaglio("UTXOSET");
-                VisualizzaUTXOSet(contenutoJson);
+                 var (count, utxoSet)  = await _blockchainManager.EstraiUTXOSet();
+                VisualizzaUTXOSet(count, utxoSet);
             }
-            else
+            catch (Exception ex)
             {
-                MessageBox.Show("File utxoset.json non trovato!");
+                MessageBox.Show($"Errore di runtime: {ex.Message}");
             }
+            
         }
 
         private async void btncreaindirizzo_Click(object? sender, EventArgs e)
@@ -140,8 +134,7 @@ namespace Blockchain
 
     try 
     {
-        // CHIAMATA AL COLLEGAMENTO: aspettiamo che il Manager finisca
-        // senza bloccare l'interfaccia grafica
+        
         string nuovoIndirizzo = await _blockchainManager.CreateAddressAsync();
 
         // Visualizziamo il risultato che arriva dalla tua funzione esterna
@@ -180,29 +173,27 @@ namespace Blockchain
             lblTitle.BringToFront();
         }
 
-        private void CaricaBlocchiGrafici()
+        private void CaricaBlocchiGrafici(List<Blocks> catena)
         {
             pnlContainer.Controls.Clear();
             pnlContainer.AutoScroll = true;
             int coordinataX = 20;
 
-            var catena = _blockchainManager.Chain;
 
             foreach (var bloccoDati in catena)
             {
                 Panel bloccoGrafico = CreaSingoloBlocco(
-                    bloccoDati.Index.ToString(),
-                    bloccoDati.Timestamp,
-                    bloccoDati.Transactions,
+                    bloccoDati.Timestamp.ToString(),
                     bloccoDati.Hash,
-                    bloccoDati.Nonce.ToString(),
+                    bloccoDati.Nonce,
+                    bloccoDati.Transactions,
                     bloccoDati.Height
-                );
+                    );
 
                 bloccoGrafico.Location = new Point(coordinataX, 100);
                 pnlContainer.Controls.Add(bloccoGrafico);
 
-                if (bloccoDati.Index < catena.Count - 1)
+                if (bloccoDati.Height < catena.Count - 1)
                 {
                     Label freccia = new Label
                     {
@@ -218,107 +209,101 @@ namespace Blockchain
             }
         }
 
-        private Panel CreaSingoloBlocco(string id, long timestamp, List<TransactionData>? transactions, string hash,string nonce, int height)
+       private Panel CreaSingoloBlocco(string timestamp, string hash, int nonce, List<TransactionData>? transactions, int height)
+{
+
+    Panel card = new Panel
+    {
+        Size = new Size(230, 280),
+        BackColor = Color.White,
+        BorderStyle = BorderStyle.FixedSingle
+    };
+
+
+    Label lblHeader = new Label
+    {
+        Text = "🔒 BLOCK #" + height,
+        BackColor = Color.FromArgb(41, 171, 226),
+        ForeColor = Color.White,
+        Dock = DockStyle.Top,
+        Height = 35,
+        TextAlign = ContentAlignment.MiddleCenter,
+        Font = new Font("Segoe UI", 10, FontStyle.Bold)
+    };
+
+    
+    Label lblTimestamp = new Label
+    {
+        Text = "Data: " + timestamp,
+        ForeColor = Color.DimGray,
+        Location = new Point(10, 45), 
+        Size = new Size(200, 20),
+        TextAlign = ContentAlignment.MiddleLeft,
+        Font = new Font("Segoe UI", 8)
+    };
+
+    
+    string hashBreve = (hash.Length > 15) ? hash.Substring(0, 15) + "..." : hash;
+    Label lblHash = new Label
+    {
+        Text = "Hash: " + hashBreve,
+        Location = new Point(10, 70),
+        Size = new Size(200, 20),
+        ForeColor = Color.Black,
+        Font = new Font("Segoe UI", 8, FontStyle.Bold)
+    };
+
+    
+    Label lblTitoloTrans = new Label
+    {
+        Text = "Transazioni:",
+        Location = new Point(10, 100),
+        Size = new Size(200, 15),
+        Font = new Font("Segoe UI", 8, FontStyle.Underline)
+    };
+
+    string elencoTransazioni = "";
+    if (transactions != null && transactions.Count > 0)
+    {
+        foreach (var tx in transactions)
         {
-            Panel card = new Panel
-            {
-                Size = new Size(220, 270),
-                BackColor = Color.White,
-                BorderStyle = BorderStyle.FixedSingle
-            };
-
-            Label lblHeader = new Label
-            {
-                Text = "🔒 BLOCK #" + id,
-                BackColor = Color.FromArgb(41, 171, 226),
-                ForeColor = Color.White,
-                Dock = DockStyle.Top,
-                Height = 30,
-                TextAlign = ContentAlignment.MiddleCenter,
-                Font = new Font("Segoe UI", 10, FontStyle.Bold)
-            };
-
-            Label lblTimestamp = new Label
-            {
-                Text = "Timestamp: " + timestamp,
-                BackColor = Color.FromArgb(45, 45, 45),
-                ForeColor = Color.White,
-                Location = new Point(10, 40),
-                Size = new Size(200, 20),
-                TextAlign = ContentAlignment.MiddleCenter,
-                Font = new Font("Segoe UI", 8)
-            };
-
-            string elencoTransazioni = "";
-            if (transactions != null && transactions.Count > 0)
-            {
-                foreach (var tx in transactions)
-                {
-                    string idBreve = (tx.ID?.Length > 10) 
-                        ? tx.ID.Substring(0, 10) 
-                        : tx.ID ?? "Errore ID";
-                    elencoTransazioni += $"• ID: {idBreve}...\n";
-                }
-            }
-            else
-            {
-                elencoTransazioni = "Nessuna transazione";
-            }
-
-            Label lblData = new Label
-            {
-                Text = elencoTransazioni,
-                BackColor = Color.FromArgb(45, 45, 45),
-                ForeColor = Color.White,
-                Location = new Point(10, 100),
-                Size = new Size(200, 100),
-                TextAlign = ContentAlignment.TopCenter,
-                Font = new Font("Segoe UI", 9),
-                AutoSize = false
-            };
-
-            Label lblHash = new Label
-            {
-                Text = "Hash:" + (hash.Length > 15 
-                    ? hash.Substring(0, 15) + "..." 
-                    : hash),
-                BackColor = Color.FromArgb(45, 45, 45),
-                ForeColor = Color.White,
-                Location = new Point(10, 60),
-                Size = new Size(200, 25),
-                TextAlign = ContentAlignment.MiddleCenter
-            };
-
-            Label lblNonce = new Label
-            {
-                Text = "Nonce:" + nonce,
-                BackColor = Color.FromArgb(45, 45, 45),
-                ForeColor = Color.White,
-                Location = new Point(10, 200),
-                Size = new Size(200, 25),
-                TextAlign = ContentAlignment.MiddleCenter
-            };
-
-            Label lblHeight = new Label
-            {
-                Text = "Height:" + height,
-                BackColor = Color.FromArgb(45, 45, 45),
-                ForeColor = Color.White,
-                Location = new Point(10, 230),
-                Size = new Size(200, 25),
-                TextAlign = ContentAlignment.MiddleCenter
-            };
-
-            card.Controls.Add(lblHeader);
-            card.Controls.Add(lblTimestamp);
-            card.Controls.Add(lblData);
-            card.Controls.Add(lblHash);
-            card.Controls.Add(lblNonce);
-            card.Controls.Add(lblHeight);
-
-            return card;
+            string idBreve = (tx.ID?.Length > 20) ? tx.ID.Substring(0, 20) : tx.ID ?? "Errore";
+            elencoTransazioni += $"• {idBreve}..\n";
         }
+    }
+    else { elencoTransazioni = "Nessuna"; }
 
+    Label lblData = new Label
+    {
+        Text = elencoTransazioni,
+        BackColor = Color.FromArgb(240, 240, 240), 
+        ForeColor = Color.Black,
+        Location = new Point(10, 120),
+        Size = new Size(200, 100), 
+        TextAlign = ContentAlignment.TopLeft,
+        Font = new Font("Consolas", 8) 
+    };
+
+    
+    Label lblNonce = new Label
+    {
+        Text = "Nonce: " + nonce,
+        Location = new Point(10, 230),
+        Size = new Size(200, 25),
+        TextAlign = ContentAlignment.MiddleRight,
+        Font = new Font("Segoe UI", 8, FontStyle.Italic)
+    };
+
+    // Aggiungiamo tutto alla scheda
+    card.Controls.Add(lblHeader);
+    card.Controls.Add(lblTimestamp);
+    card.Controls.Add(lblHash);
+    card.Controls.Add(lblTitoloTrans);
+    card.Controls.Add(lblData);
+    card.Controls.Add(lblNonce);
+
+    return card;
+}
         private void VisualizzaStatistiche(string jsonContenuto)
         {
             pnlContainer.Controls.Clear();
@@ -364,7 +349,7 @@ namespace Blockchain
             }
         }
 
-        private void CaricaWalletGrafici(List<string> walletList, int count)
+    private void CaricaWalletGrafici(List<string> walletList, int count)
 {
     pnlContainer.Controls.Clear();
     pnlContainer.AutoScroll = true;
@@ -407,15 +392,108 @@ namespace Blockchain
             ForeColor = Color.White,
             Font = new Font("Consolas", 10), 
             Location = new Point(15, 35),
-            Size = new Size(walletCard.Width - 30, 30),
+            Size = new Size(walletCard.Width - 200, 30), // Ridotto per far spazio al bottone
             TextAlign = ContentAlignment.MiddleLeft
+        };
+
+        // Componente Bottone per l'invio (Orientamento ai Componenti)
+        Button btnInvia = new Button
+        {
+            Text = "INVIA",
+            Size = new Size(120, 40),
+            Location = new Point(walletCard.Width - 140, 20),
+            BackColor = Color.FromArgb(0, 122, 204),
+            ForeColor = Color.White,
+            FlatStyle = FlatStyle.Flat,
+            Font = new Font("Segoe UI", 9, FontStyle.Bold),
+            Cursor = Cursors.Hand,
+            Tag = wallet // Utilizziamo il Tag per trasportare l'indirizzo
+        };
+
+        // Sottoscrizione all'evento 
+        btnInvia.Click += (s, e) => {
+             if (s is Button b && b.Tag != null)
+             {
+                 MostraSchermataDettaglioInvio(b.Tag.ToString()!);
+             }
         };
 
         walletCard.Controls.Add(lblTag);
         walletCard.Controls.Add(lblAddress);
+        walletCard.Controls.Add(btnInvia);
         pnlContainer.Controls.Add(walletCard);
 
         coordinataY += 95; 
+    }
+}
+// Componente di classe per l'ammontare (Orientamento ai Componenti)
+private ComboBox? _selezioneImporto;
+private void MostraSchermataDettaglioInvio(string destinatario)
+{
+    pnlContainer.Controls.Clear();
+
+    Label lblDest = new Label {
+        Text = $"INVIO A: {destinatario}",
+        ForeColor = Color.White,
+        Font = new Font("Segoe UI", 12, FontStyle.Bold),
+        Location = new Point(30, 30),
+        AutoSize = true
+    };
+
+    // Inizializzazione del componente di classe
+    _selezioneImporto = new ComboBox {
+        Location = new Point(30, 80),
+        Size = new Size(150, 30),
+        DropDownStyle = ComboBoxStyle.DropDownList,
+        BackColor = Color.White
+    };
+    for (int i = 1; i <= 10; i++) _selezioneImporto.Items.Add(i);
+    _selezioneImporto.SelectedIndex = 0;
+
+    Button btnConferma = new Button {
+        Text = "CONFERMA TRANSAZIONE",
+        Location = new Point(30, 130),
+        Size = new Size(200, 45),
+        BackColor = Color.SeaGreen,
+        ForeColor = Color.White,
+        FlatStyle = FlatStyle.Flat,
+        Tag = destinatario // Trasporto dati tramite oggetto Tag
+    };
+
+    // Sottoscrizione formale all'evento (Concetto di prima classe)
+    btnConferma.Click += BtnConferma_Click;
+
+    pnlContainer.Controls.Add(lblDest);
+    pnlContainer.Controls.Add(_selezioneImporto);
+    pnlContainer.Controls.Add(btnConferma);
+}
+private async void BtnConferma_Click(object? sender, EventArgs e)
+{
+    // Validazione per evitare dereferenziazione nulla (Software Robusto)
+    if (_selezioneImporto?.SelectedItem == null) return;
+
+    if (sender is Button btn && btn.Tag != null)
+    {
+        // Recupero sicuro dei dati dal componente
+        string destinatario = btn.Tag.ToString()!;
+        int ammontare = (int)_selezioneImporto.SelectedItem;
+        string mittente = "1FJxTcQfU7U5MGwz31LGZwqafgWAtqi2kj";
+
+        try 
+        {
+            // Chiamata asincrona al manager per preservare l'investimento
+            bool esito = await _blockchainManager.InviaTransazioneAsync(mittente, destinatario, ammontare);
+            
+            if (esito) 
+                MessageBox.Show("Transazione inviata al nodo Go!", "Blockchain Update", MessageBoxButtons.OK, MessageBoxIcon.Information);
+            else 
+                MessageBox.Show("Errore nell'invio. Verifica il server Go.", "Errore Runtime", MessageBoxButtons.OK, MessageBoxIcon.Error);
+        }
+        catch (Exception ex)
+        {
+            // Gestione errori per un software durevole
+            MessageBox.Show($"Eccezione in fase di esecuzione: {ex.Message}");
+        }
     }
 }
 
@@ -452,7 +530,7 @@ namespace Blockchain
                     testoInput += $"• Prev TxID: {primoIn.TxID}\n" +
                                   $"• Index:     {primoIn.OutputIndex}\n" +
                                   $"• Signature: {primoIn.Signature}\n" +
-                                  $"• PubKey:    {primoIn.PubKey}";
+                                  $"• PubKey:    {primoIn.pub_key_hash}";
                 }
                 else
                 {
@@ -472,8 +550,8 @@ namespace Blockchain
                 Label lblOutput = new Label
                 {
                     Text = $"OUTPUT:\n" +
-                           $"• A: {primoOut?.PubKeyHash ?? "N/D"}\n" +
-                           $"• Valore: {primoOut?.Value} BTC",
+                           $"• A: {primoOut?.pub_key_hash ?? "N/D"}\n" +
+                           $"• Valore: {primoOut?.value} BTC",
                     Font = new Font("Consolas", 9, FontStyle.Bold),
                     Location = new Point(15, 140),
                     Size = new Size(500, 135),
@@ -488,81 +566,97 @@ namespace Blockchain
             }
         }
 
-        private void VisualizzaUTXOSet(string jsonContenuto)
+private void VisualizzaUTXOSet(int count, List<Utxo> utxoset)
+{
+    pnlContainer.Controls.Clear();
+    pnlContainer.AutoScroll = true;
+    pnlContainer.BackColor = Color.FromArgb(30, 30, 30); 
+
+    Label lblTitolo = new Label
+    {
+        Text = $"DISPONIBILITÀ UTXO: {count}",
+        Font = new Font("Segoe UI", 16, FontStyle.Bold),
+        ForeColor = Color.FromArgb(41, 171, 226), // Blu neon
+        Location = new Point(20, 15),
+        AutoSize = true
+    };
+    pnlContainer.Controls.Add(lblTitolo);
+
+    int coordinataY = 65;
+
+    foreach (var utxo in utxoset)
+    {
+        //
+        Panel utxoCard = new Panel
         {
-            pnlContainer.Controls.Clear();
-            var utxoset = _blockchainManager.EstraiUTXOSet(jsonContenuto);
-            int coordinataY = 20;
-            pnlContainer.AutoScroll = true;
+            Size = new Size(580, 140),
+            BackColor = Color.White,
+            Location = new Point(20, coordinataY),
+        };
 
-            foreach (var utxo in utxoset)
-            {
-                Panel utxoCard = new Panel
-                {
-                    Size = new Size(600, 160),
-                    BackColor = Color.GhostWhite,
-                    BorderStyle = BorderStyle.FixedSingle,
-                    Location = new Point(20, coordinataY)
-                };
+    
+        string IdBreve = (utxo.tx_id?.Length > 15) ? utxo.tx_id.Substring(0, 30) + "..." : utxo.tx_id ?? "N/D";
+        Label lblHeader = new Label
+        {
+            Text = $" TX-ID: {IdBreve}",
+            Font = new Font("Consolas", 10, FontStyle.Bold),
+            BackColor = Color.FromArgb(240, 240, 240),
+            ForeColor = Color.DarkSlateBlue,
+            Dock = DockStyle.Top,
+            Height = 30,
+            TextAlign = ContentAlignment.MiddleLeft
+        };
 
-                Label lblHeader = new Label
-                {
-                    Text = $"OUTPUT NON SPESO DALLA TX: {utxo.TxID ?? "N/D"}",
-                    Font = new Font("Consolas", 9, FontStyle.Bold),
-                    Location = new Point(10, 10),
-                    Size = new Size(580, 20),
-                    ForeColor = Color.DarkSlateBlue
-                };
+        Label lblValore = new Label
+        {
+            Text = $"{utxo.value} BTC", 
+            Font = new Font("Segoe UI", 18, FontStyle.Bold),
+            ForeColor = Color.ForestGreen,
+            Location = new Point(15, 40),
+            Size = new Size(200, 50),
+        
+        };
 
-                Label lblDettagli = new Label
-                {
-                    Text = $"• Output Index: {utxo.Index}\n",
-                    Font = new Font("Consolas", 9, FontStyle.Regular),
-                    Location = new Point(10, 50),
-                    Size = new Size(500, 40),
-                    ForeColor = Color.Black
-                };
+    
+        Label lblInfo = new Label
+        {
+            Text = $"Index: #{utxo.index}\nProprietario: {utxo.pub_key_hash}",
+            Font = new Font("Consolas", 9, FontStyle.Regular),
+            ForeColor = Color.Gray,
+            Location = new Point(18, 85),
+            Size = new Size(550, 40)
+        };
 
-                var primoOut = utxo.Outputs?.Count > 0 ? utxo.Outputs[0] : null;
-                Label lblValore = new Label
-                {
-                    Text = $"DETTAGLI BILANCIO:\n" +
-                           $"• Indirizzo: {primoOut?.PubKeyHash ?? "N/D"}\n" +
-                           $"• Importo Disponibile: {primoOut?.Value} BTC",
-                    Font = new Font("Consolas", 10, FontStyle.Bold),
-                    Location = new Point(15, 90),
-                    Size = new Size(500, 60),
-                    ForeColor = Color.DarkGreen
-                };
+        
+        utxoCard.Controls.Add(lblInfo);
+        utxoCard.Controls.Add(lblValore);
+        utxoCard.Controls.Add(lblHeader);
+        pnlContainer.Controls.Add(utxoCard);
 
-                utxoCard.Controls.Add(lblHeader);
-                utxoCard.Controls.Add(lblDettagli);
-                utxoCard.Controls.Add(lblValore);
-                pnlContainer.Controls.Add(utxoCard);
-                coordinataY += 180;
-            }
-        }
+        coordinataY += 155; 
+    }
+}
         private void VisualizzaNuovoIndirizzo(string indirizzo)
 {
-    // Pulizia e preparazione del contenitore come in CaricaWalletGrafici
+    
     pnlContainer.Controls.Clear();
     pnlContainer.AutoScroll = true;
 
-    // Creazione della "Card" per il nuovo indirizzo (Software Robusto)
+    
     Panel addressCard = new Panel
     {
         Size = new Size(400, 100),
         BackColor = Color.White,
         BorderStyle = BorderStyle.FixedSingle,
-        Location = new Point(20, 20) // Posizionato in alto nel pannello
+        Location = new Point(20, 20) 
     };
 
     Label lblHeader = new Label
     {
-        Text = "✨ NUOVO INDIRIZZO GENERATO",
+        Text = "NUOVO INDIRIZZO GENERATO",
         Font = new Font("Segoe UI", 10, FontStyle.Bold),
         ForeColor = Color.White,
-        BackColor = Color.FromArgb(0, 120, 215), // Colore coerente con i bottoni
+        BackColor = Color.FromArgb(0, 120, 215), 
         Dock = DockStyle.Top,
         Height = 30,
         TextAlign = ContentAlignment.MiddleCenter
@@ -578,11 +672,11 @@ namespace Blockchain
         TextAlign = ContentAlignment.MiddleCenter
     };
 
-    // Composizione dei componenti (Orientamento ai componenti)
     addressCard.Controls.Add(lblAddress);
     addressCard.Controls.Add(lblHeader);
     
     pnlContainer.Controls.Add(addressCard);
 }
+
     }
 }

@@ -4,111 +4,75 @@ using System.Text.Json;
 using System.Diagnostics;
 using System.Net.Http; 
 using System.Threading.Tasks;
+using System.Text;
 
 namespace Blockchain.Core
 {
     // Classe per gli argomenti dell'evento
     public class BlockAddedEventArgs : EventArgs
     {
-        public Block NewBlock { get; }
-        public BlockAddedEventArgs(Block block) => NewBlock = block;
+        public Blocks NewBlock { get; }
+        public BlockAddedEventArgs(Blocks block) => NewBlock = block;
     }
 
     public class BlockchainManager
     {
-        private List<Block> _chain;
+        private List<Blocks> _chain;
 
-        // Definizione dell'evento per notificare quando un nuovo blocco viene aggiunto
+        // Evento di prima classe per notificare la UI
         public event EventHandler<BlockAddedEventArgs>? BlockAdded;
 
         public BlockchainManager()
         {
-            _chain = new List<Block>();
-            AddGenesisBlock();
+            _chain = new List<Blocks>();
         }
 
-        // --- GESTIONE CORE BLOCKCHAIN ---
+        public IReadOnlyList<Blocks> Chain => _chain.AsReadOnly();
 
-        private void AddGenesisBlock()
+        public async Task<List<Blocks>> SincronizzaBlockchain()
         {
-            var genesis = new Block
+            using (var client = new HttpClient())
             {
-                Index = 0,
-                Timestamp = DateTimeOffset.UtcNow.ToUnixTimeSeconds(),
-                Transactions = new List<TransactionData>(),
-                PreviousHash = "0",
-                Hash = "GENESIS_HASH",
-                Nonce = 0,
-                Height = 1
-            };
-            _chain.Add(genesis);
-        }
-
-        public void AddBlock(int Index, long Timestamp, List<TransactionData> transactions, string hash, int nonce, int height)
-        {
-            try
-            {
-                var lastBlock = _chain[_chain.Count - 1];
-                var newBlock = new Block
+                try
                 {
-                    Index = Index,
-                    Timestamp = Timestamp,
-                    Transactions = transactions,
-                    PreviousHash = lastBlock.Hash,
-                    Hash = hash,
-                    Nonce = nonce,
-                    Height = height
-                };
+                    // Chiamata all'endpoint definito nel router Go
+                    string jsonRicevuto = await client.GetStringAsync("http://localhost:8080/api/print-blockchain");
 
-                _chain.Add(newBlock);
-                OnBlockAdded(newBlock);
-            }
-            catch (Exception ex)
-            {
-                throw new InvalidOperationException("Errore durante la creazione del blocco", ex);
+                    var options = new JsonSerializerOptions { PropertyNameCaseInsensitive = true };
+
+                    // Deserializzazione della radice "blocks"
+                    var root = JsonSerializer.Deserialize<BlockchainResponse>(jsonRicevuto, options);
+                    
+                    if (root?.Blocks != null)
+                    {
+                        // Software Robusto: puliamo la catena per evitare dati incoerenti
+                        _chain.Clear(); 
+                        
+                        foreach (var b in root.Blocks)
+                        {
+                            _chain.Add(b);
+                            // Notifica dell'evento per aggiornare la grafica
+                            OnBlockAdded(b);
+                        }
+                        return _chain;
+                    }
+                    return new List<Blocks>();
+                }
+                catch (HttpRequestException ex)
+                {
+                    throw new Exception("Il nodo Go non risponde sulla porta 8080.", ex);
+                }
+                catch (JsonException ex)
+                {
+                    throw new Exception("Errore nel formato dei dati (JSON) ricevuti.", ex);
+                }
             }
         }
 
-        protected virtual void OnBlockAdded(Block block)
+        protected virtual void OnBlockAdded(Blocks block)
         {
             BlockAdded?.Invoke(this, new BlockAddedEventArgs(block));
         }
-
-        public IReadOnlyList<Block> Chain => _chain.AsReadOnly();
-
-
-        public void RiceviBloccoDaGo(string jsonRicevuto)
-        {
-            try
-            {
-                // 1. Type Safety: Definiamo le opzioni per far corrispondere le proprietà JSON alle classi 
-                var options = new JsonSerializerOptions { PropertyNameCaseInsensitive = true };
-
-                // 2. Orientamento ai componenti: Deserializziamo i dati in una collezione di oggetti Block
-                List<Block>? nuoviBlocchi = JsonSerializer.Deserialize<List<Block>>(jsonRicevuto, options);
-
-                if (nuoviBlocchi != null)
-                {
-                    foreach (var b in nuoviBlocchi)
-                    {
-                        // Verifichiamo l'integrità prima di aggiungere alla catena esistente
-                        if (!_chain.Exists(x => x.Hash == b.Hash))
-                        {
-                            _chain.Add(b);
-
-                            // 3. Eventi: Notifichiamo il sistema del nuovo componente aggiunto
-                            OnBlockAdded(b);
-                        }
-                    }
-                }
-            }
-            catch (JsonException ex)
-            {
-                // 4. Software Robusto: Gestiamo l'errore a runtime senza interrompere l'esecuzione
-                Console.WriteLine($"Errore nei metadati JSON ricevuti: {ex.Message}");
-            }
-        }
-
         public void EseguiAggiornamentoPython()
         {
             try
@@ -160,13 +124,13 @@ namespace Blockchain.Core
             catch (Exception) { return new List<Analitica>(); }
         }
 
-       // Nel file BlockchainManager.cs
+
 public async Task<(List<string> Lista, int Totale)> EstraiListaWallet() 
 {
     using HttpClient client = new HttpClient();
     try
     {
-        // Assicurati che l'URL sia corretto per il tuo server
+        
         var response = await client.GetAsync("http://localhost:8080/api/get-addresses");
         response.EnsureSuccessStatusCode();
 
@@ -220,37 +184,39 @@ public async Task<(List<string> Lista, int Totale)> EstraiListaWallet()
             }
         }
 
-        public List<Utxo> EstraiUTXOSet(string jsonRicevuto)
+        public async Task<(int count, List<Utxo> Utxos)> EstraiUTXOSet()
+{
+    using HttpClient client = new HttpClient();
+    try
+    {
+        // 1. Chiamata API
+        var response = await client.GetAsync("http://localhost:8080/api/print-utxoset");
+        response.EnsureSuccessStatusCode();
+
+        // 2. Lettura del contenuto
+        string jsonRicevuto = await response.Content.ReadAsStringAsync();
+
+        // 3. Deserializzazione (trasformo il testo in oggetti C#)
+        var options = new JsonSerializerOptions { PropertyNameCaseInsensitive = true };
+        var root = JsonSerializer.Deserialize<UtxoResponse>(jsonRicevuto, options);
+
+        // 4. Controllo se i dati ci sono
+        if (root?.Utxos == null)
         {
-            try
-            {
-                var options = new JsonSerializerOptions { PropertyNameCaseInsensitive = true };
-                var listaUtxo = JsonSerializer.Deserialize<List<Utxo>>(jsonRicevuto, options);
-
-                if (listaUtxo == null)
-                {
-                    return new List<Utxo>();
-                }
-
-                var risultato = new List<Utxo>();
-                foreach (var utxo in listaUtxo)
-                {
-                    risultato.Add(new Utxo
-                    {
-                        TxID = utxo.TxID ?? "ID Transazione Sconosciuto",
-                        Index = utxo.Index,
-                        Outputs = utxo.Outputs ?? new List<TxOutputData>()
-                    });
-                }
-                return risultato;
-            }
-            catch (Exception ex)
-            {
-                Console.WriteLine($"Errore critico durante l'estrazione dell'UTXO Set: {ex.Message}");
-                return new List<Utxo>();
-            }
+            return (0, new List<Utxo>());
         }
-        // Esempio di collegamento a una funzione esistente
+
+        // Restituisco direttamente i dati ottenuti
+        return (root.count, root.Utxos);
+    }
+    catch (Exception ex)
+    {
+        // Gestione errori semplice
+        Console.WriteLine($"Errore: {ex.Message}");
+        return (0, new List<Utxo>());
+    }
+}
+       
 
 public async Task<string> CreateAddressAsync()
 {
@@ -266,12 +232,36 @@ public async Task<string> CreateAddressAsync()
         var opzioni = new JsonSerializerOptions { PropertyNameCaseInsensitive = true };
         var dati = JsonSerializer.Deserialize<WalletAccount>(jsonContenuto, opzioni);
 
-        // Restituiamo solo l'indirizzo pulito, non tutto il JSON
+        // Restituiamo solo l'indirizzo , non tutto il JSON
         return dati?.Address ?? "Indirizzo non trovato";
     }
     catch (Exception ex)
     {
         return "Errore: " + ex.Message;
+    }
+}
+public async Task<bool> InviaTransazioneAsync(string mittente, string destinatario, int ammontare)
+{
+    using (var client = new HttpClient())
+    {
+        var transazione = new { from = mittente, to = destinatario, amount = ammontare };
+
+        try 
+        {
+            string jsonBody = JsonSerializer.Serialize(transazione);
+            
+            // Correzione CS1503: Passiamo (stringa, codifica, mediaType)
+            var content = new StringContent(jsonBody, Encoding.UTF8, "application/json");
+
+            var response = await client.PostAsync("http://localhost:8080/api/tx", content);
+            return response.IsSuccessStatusCode;
+        }
+        catch (Exception ex)
+        {
+            // Software robusto: gestione dell'eccezione in runtime
+            Console.WriteLine($"Errore: {ex.Message}");
+            return false;
+        }
     }
 }
     }

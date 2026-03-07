@@ -18,12 +18,12 @@ public class TxInputData
     public string? TxID { get; set; }
     public int OutputIndex { get; set; }
     public string? Signature { get; set; }
-    public string? PubKey { get; set; }
+    public string? pub_key_hash { get; set; }
 }
 
 public class TxOutputData
 {
-    public double Value { get; set; }
-    public string? PubKeyHash { get; set; }
+    public double value { get; set; }
+    public string? pub_key_hash { get; set; }
 }
 }
