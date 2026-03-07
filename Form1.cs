@@ -28,7 +28,7 @@ namespace Blockchain
             // 2. Gestione Eventi Standard
             btnVisualizzaBlockchain.Click += BtnVisualizzaBlockchain_Click;
             btnAggiungiWallet.Click += BtnAggiungiWallet_Click;
-            btnInviaTransazione.Click += BtnInviaTransazione_Click;
+            btnVisualizzaTransazione.Click += BtnVisualizzaTransazione_Click;
             btnAnalitiche.Click += BtnAnalitiche_Click;
             btnUTXOSet.Click += BtnUTXOSet_Click;
             btncreaindirizzo.Click += btncreaindirizzo_Click;
@@ -103,31 +103,35 @@ namespace Blockchain
     }
 }
         
+private async void BtnVisualizzaTransazione_Click(object? sender, EventArgs e)
+{
+    PreparaAreaLavoro("TUTTE LE TRANSAZIONI");
 
+    try
+    {
+        // 1. Recuperiamo la blockchain aggiornata dal nodo Go
+        List<Blocks> catenaCompleta = await _blockchainManager.SincronizzaBlockchain();
 
-        private void BtnInviaTransazione_Click(object? sender, EventArgs e)
+        // 2. Estraiamo TUTTE le transazioni da TUTTI i blocchi
+        List<TransactionData> tutteLeTransazioni = new List<TransactionData>();
+        
+        foreach (var blocco in catenaCompleta)
         {
-             PreparaAreaLavoro("TRANSAZIONE");
-            string nomeFile = "transazioni.json";
-
-            if (File.Exists(nomeFile))
+            if (blocco.Transactions != null)
             {
-                try
-                {
-                    string contenutoJson = File.ReadAllText(nomeFile);
-                    CaricaTransazioniGrafiche(contenutoJson);
-                }
-                catch (Exception ex)
-                {
-                    MessageBox.Show($"Errore di runtime: {ex.Message}");
-                }
-            }
-            else
-            {
-                MessageBox.Show("Il file transazioni.json non è stato trovato.");
+                tutteLeTransazioni.AddRange(blocco.Transactions);
             }
         }
 
+        TransazioniGrafiche(tutteLeTransazioni);
+    }
+    catch (Exception ex)
+    {
+        MessageBox.Show($"Errore nel recupero transazioni: {ex.Message}");
+    }
+}
+
+        
         private async void BtnUTXOSet_Click(object? sender, EventArgs e)
         {
             _blockchainManager.EseguiAggiornamentoPython();
@@ -196,7 +200,7 @@ private void ConfiguraMenuNavigazione(string porta)
     AggiungiBottoneAlMenu(btnUTXOSet);
     AggiungiBottoneAlMenu(btnAnalitiche);
     AggiungiBottoneAlMenu(btnVisualizzaBlockchain);
-    AggiungiBottoneAlMenu(btnInviaTransazione);
+    AggiungiBottoneAlMenu(btnVisualizzaTransazione);
     AggiungiBottoneAlMenu(btnAggiungiWallet);
     
     StilizzaBottoneNav(btnHome, "🏠 HOME", Color.FromArgb(45, 45, 48));
@@ -323,28 +327,38 @@ private void BtnHome_Click(object? sender, EventArgs e)
         Size = new Size(200, 15),
         Font = new Font("Segoe UI", 8, FontStyle.Underline)
     };
-
-    string elencoTransazioni = "";
-    if (transactions != null && transactions.Count > 0)
-    {
-        foreach (var tx in transactions)
-        {
-            string idBreve = (tx.ID?.Length > 20) ? tx.ID.Substring(0, 20) : tx.ID ?? "Errore";
-            elencoTransazioni += $"• {idBreve}..\n";
-        }
+FlowLayoutPanel flowTrans = new FlowLayoutPanel {
+    Location = new Point(10, 120),
+    Size = new Size(210, 100),
+    BackColor = Color.FromArgb(245, 245, 245),
+    AutoScroll = true,
+    FlowDirection = FlowDirection.TopDown,
+    WrapContents = false
+};
+    if (transactions != null && transactions.Count > 0) {
+    foreach (var tx in transactions) {
+        Button btnLink = new Button {
+            Text = "• " + (tx.id?.Length > 12 ? tx.id.Substring(0, 12) + "..." : tx.id),
+            Size = new Size(185, 25),
+            FlatStyle = FlatStyle.Flat,
+            TextAlign = ContentAlignment.MiddleLeft,
+            ForeColor = Color.Blue,
+            Cursor = Cursors.Hand,
+            Font = new Font("Consolas", 8, FontStyle.Underline),
+            // METADATA: Salviamo l'ID intero nel Tag per il Late Binding
+            Tag = tx.id 
+        };
+        btnLink.FlatAppearance.BorderSize = 0;
+        
+        // Sottoscrizione all'evento Click
+        btnLink.Click += LinkTransazione_Click;
+        flowTrans.Controls.Add(btnLink);
     }
-    else { elencoTransazioni = "Nessuna"; }
+}
 
-    Label lblData = new Label
-    {
-        Text = elencoTransazioni,
-        BackColor = Color.FromArgb(240, 240, 240), 
-        ForeColor = Color.Black,
-        Location = new Point(10, 120),
-        Size = new Size(200, 100), 
-        TextAlign = ContentAlignment.TopLeft,
-        Font = new Font("Consolas", 8) 
-    };
+
+
+   
 
     
     Label lblNonce = new Label
@@ -361,10 +375,58 @@ private void BtnHome_Click(object? sender, EventArgs e)
     card.Controls.Add(lblTimestamp);
     card.Controls.Add(lblHash);
     card.Controls.Add(lblTitoloTrans);
-    card.Controls.Add(lblData);
+    card.Controls.Add(flowTrans);
+    
     card.Controls.Add(lblNonce);
 
     return card;
+}
+private async void LinkTransazione_Click(object? sender, EventArgs e)
+{
+    if (sender is Button btn && btn.Tag != null)
+    {
+        string idCercato = btn.Tag.ToString()!;
+
+        try
+        {
+            // Recupero della catena (Software Robusto e Durevole)
+            List<Blocks> catena = await _blockchainManager.SincronizzaBlockchain();
+            TransactionData? txTrovata = null;
+
+            // CICLO 1: Esaminiamo ogni blocco nella catena
+            foreach (Blocks b in catena)
+            {
+                if (b.Transactions != null)
+                {
+                    // CICLO 2: Esaminiamo ogni transazione dentro il blocco (Senza =>)
+                    foreach (TransactionData t in b.Transactions)
+                    {
+                        if (t.id == idCercato)
+                        {
+                            txTrovata = t;
+                            break; // Trovata! Esco dal ciclo interno
+                        }
+                    }
+                }
+                if (txTrovata != null) break; // Esco dal ciclo esterno
+            }
+
+            if (txTrovata != null)
+            {
+                PreparaAreaLavoro("DETTAGLIO TRANSAZIONE");
+                // Riutilizzo del componente grafico
+                TransazioniGrafiche(new List<TransactionData> { txTrovata });
+            }
+            else
+            {
+                MessageBox.Show("Transazione non trovata nel registro.");
+            }
+        }
+        catch (Exception ex)
+        {
+            MessageBox.Show("Errore durante l'ispezione dei Metadata: " + ex.Message);
+        }
+    }
 }
         private void VisualizzaStatistiche(string jsonContenuto)
         {
@@ -559,74 +621,75 @@ private async void BtnConferma_Click(object? sender, EventArgs e)
     }
 }
 
-        private void CaricaTransazioniGrafiche(string jsonContenuto)
+       private void TransazioniGrafiche(List<TransactionData> transazioni)
+{
+    pnlContainer.Controls.Clear();
+    pnlContainer.AutoScroll = true;
+    int coordinataY = 20;
+
+    foreach (var tx in transazioni)
+    {
+        // Aumentiamo l'altezza (Height) a 250 perché ora sono uno sotto l'altro
+        Panel card = new Panel {
+            Size = new Size(pnlContainer.Width - 60, 250), 
+            BackColor = Color.White,
+            BorderStyle = BorderStyle.FixedSingle,
+            Location = new Point(20, coordinataY)
+        };
+
+        // Header: ID PER INTERO
+        Label lblId = new Label {
+            Text = "🆔ID-TRANSAZIONE: " + tx.id, // Rimosso Substring per stamparlo tutto
+            Dock = DockStyle.Top,
+            Height = 40,
+            BackColor = Color.FromArgb(242, 242, 242),
+            Font = new Font("Consolas", 9, FontStyle.Bold),
+            TextAlign = ContentAlignment.MiddleLeft,
+            Padding = new Padding(10, 0, 10, 0)
+        };
+
+        // Pannello INPUT (Sopra)
+        string testoIn = "📥 INPUT (Provenienza):\n";
+        if (tx.vin != null && tx.vin.Count > 0)
         {
-            pnlContainer.Controls.Clear();
-            var listaTx = _blockchainManager.EstraiListaTransazioni(jsonContenuto);
-            int coordinataY = 20;
-
-            foreach (var tx in listaTx)
-            {
-                Panel txCard = new Panel
-                {
-                    Size = new Size(600, 220),
-                    BackColor = Color.WhiteSmoke,
-                    BorderStyle = BorderStyle.FixedSingle,
-                    Location = new Point(20, coordinataY)
-                };
-
-                Label lblId = new Label
-                {
-                    Text = "TRANSACTION ID: " + (tx.ID ?? "N/D"),
-                    Font = new Font("Consolas", 9, FontStyle.Bold),
-                    Location = new Point(10, 10),
-                    Size = new Size(430, 20),
-                    ForeColor = Color.MidnightBlue
-                };
-
-                var primoIn = tx.Inputs?.Count > 0 ? tx.Inputs[0] : null;
-                string testoInput = " INPUT:\n";
-
-                if (primoIn != null)
-                {
-                    testoInput += $"• Prev TxID: {primoIn.TxID}\n" +
-                                  $"• Index:     {primoIn.OutputIndex}\n" +
-                                  $"• Signature: {primoIn.Signature}\n" +
-                                  $"• PubKey:    {primoIn.pub_key_hash}";
-                }
-                else
-                {
-                    testoInput += "• Transazione Coinbase (nessun input)";
-                }
-
-                Label lblInput = new Label
-                {
-                    Text = testoInput,
-                    Font = new Font("Consolas", 9, FontStyle.Bold),
-                    Location = new Point(10, 40),
-                    Size = new Size(500, 100),
-                    ForeColor = Color.Firebrick
-                };
-
-                var primoOut = tx.Outputs?.Count > 0 ? tx.Outputs[0] : null;
-                Label lblOutput = new Label
-                {
-                    Text = $"OUTPUT:\n" +
-                           $"• A: {primoOut?.pub_key_hash ?? "N/D"}\n" +
-                           $"• Valore: {primoOut?.value} BTC",
-                    Font = new Font("Consolas", 9, FontStyle.Bold),
-                    Location = new Point(15, 140),
-                    Size = new Size(500, 135),
-                    ForeColor = Color.ForestGreen
-                };
-
-                txCard.Controls.Add(lblId);
-                txCard.Controls.Add(lblInput);
-                txCard.Controls.Add(lblOutput);
-                pnlContainer.Controls.Add(txCard);
-                coordinataY += 220;
-            }
+            testoIn += $"• TxID: {tx.vin[0].txid ?? "N/D"}\n";
+            testoIn += $"• Vout Index: #{tx.vin[0].vout_index}\n";
+           testoIn += $"• Sorgente: {tx.vin[0].pubkey?.Substring(0, 40) ?? "N/D"}\n";
+            testoIn += $"• Signature: {(string.IsNullOrEmpty(tx.vin[0].signature) ? "N/D" : "Presente")}";
         }
+
+        Label lblInput = new Label {
+            Text = testoIn,
+            Location = new Point(15, 50),
+            Size = new Size(card.Width - 30, 80), 
+            ForeColor = Color.Firebrick,
+            Font = new Font("Segoe UI", 9, FontStyle.Bold)
+        };
+
+        // Pannello OUTPUT (Sotto)
+        string testoOut = "📤 OUTPUT (Destinazione):\n";
+        if (tx.vout != null && tx.vout.Count > 0)
+        {
+            testoOut += $"• Destinatario: {tx.vout[0].pubkey_hash}\n";
+            testoOut += $"• Importo: {tx.vout[0].value} BTC";
+        }
+
+        Label lblOutput = new Label {
+            Text = testoOut,
+            Location = new Point(15, 160), // Posizionato sotto l'input
+            Size = new Size(card.Width - 30, 80), // Larghezza piena
+            ForeColor = Color.ForestGreen,
+            Font = new Font("Segoe UI", 9, FontStyle.Bold)
+        };
+
+        card.Controls.Add(lblOutput);
+        card.Controls.Add(lblInput);
+        card.Controls.Add(lblId);
+        pnlContainer.Controls.Add(card);
+
+        coordinataY += 265; // Aumentato lo spazio tra le card
+    }
+}
 
 private void VisualizzaUTXOSet(int count, List<Utxo> utxoset)
 {

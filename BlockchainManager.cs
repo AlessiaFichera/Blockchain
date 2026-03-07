@@ -182,9 +182,9 @@ namespace Blockchain.Core
                 {
                     listaTransazioni.Add(new TransactionData
                     {
-                        ID = tx.ID ?? "ID Sconosciuto",
-                        Inputs = tx.Inputs ?? new List<TxInputData>(),
-                        Outputs = tx.Outputs ?? new List<TxOutputData>()
+                        id = tx.id ?? "ID Sconosciuto",
+                        vin = tx.vin ?? new List<TxInputData>(),
+                        vout = tx.vout ?? new List<TxOutputData>()
                     });
                 }
                 return listaTransazioni;

@@ -16,7 +16,7 @@ partial class Form1
 
     // Bottoni Funzionalità (Dashboard)
     private Button btnAggiungiWallet;
-    private Button btnInviaTransazione;
+    private Button btnVisualizzaTransazione;
     private Button btnVisualizzaBlockchain;
     private Button btnAnalitiche;
     private Button btnUTXOSet;
@@ -52,7 +52,7 @@ partial class Form1
         picGrafico = new PictureBox();
 
         btnAggiungiWallet = new Button();
-        btnInviaTransazione = new Button();
+        btnVisualizzaTransazione = new Button();
         btnVisualizzaBlockchain = new Button();
         btnAnalitiche = new Button();
         btnUTXOSet = new Button();
@@ -128,7 +128,7 @@ partial class Form1
         // 3. BOTTONI FUNZIONALI (Dashboard)
         // 
         StilizzaBottoneFunzione(btnAggiungiWallet, "Wallet Disponibili", 100);
-        StilizzaBottoneFunzione(btnInviaTransazione, "Cronologia Transazioni", 170);
+        StilizzaBottoneFunzione(btnVisualizzaTransazione, "Cronologia Transazioni", 170);
         StilizzaBottoneFunzione(btnVisualizzaBlockchain, "Visualizza Blockchain", 240);
         StilizzaBottoneFunzione(btnAnalitiche, "Analitiche", 310);
         StilizzaBottoneFunzione(btnUTXOSet, "UTXO Set", 380);
@@ -143,7 +143,7 @@ partial class Form1
 
         // Aggiunta controlli al Container
         pnlContainer.Controls.Add(btnAggiungiWallet);
-        pnlContainer.Controls.Add(btnInviaTransazione);
+        pnlContainer.Controls.Add(btnVisualizzaTransazione);
         pnlContainer.Controls.Add(btnVisualizzaBlockchain);
         pnlContainer.Controls.Add(btnAnalitiche);
         pnlContainer.Controls.Add(btnUTXOSet);

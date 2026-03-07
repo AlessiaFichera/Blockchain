@@ -1,3 +1,4 @@
+
 namespace Blockchain.Core
 {
     public class TransactionRoot
@@ -6,24 +7,30 @@ namespace Blockchain.Core
     public List<TransactionData>? Transactions { get; set; }
 }
 
+
+
 public class TransactionData
 {
-    public string? ID { get; set; }
-    public List<TxInputData>? Inputs { get; set; }
-    public List<TxOutputData>? Outputs { get; set; }
+  
+    public string? id { get; set; }
+
+ 
+    public List<TxInputData>? vin { get; set; }
+
+    public List<TxOutputData>? vout { get; set; }
 }
 
 public class TxInputData
 {
-    public string? TxID { get; set; }
+    public string? txid { get; set; }
     public int vout_index { get; set; }
-    public string? Signature { get; set; }
-    public string? pub_key_hash { get; set; }
+    public string? signature { get; set; }
+    public string? pubkey { get; set; }
 }
 
 public class TxOutputData
 {
     public double value { get; set; }
-    public string? pub_key_hash { get; set; }
+    public string? pubkey_hash { get; set; }
 }
 }
