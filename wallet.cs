@@ -12,4 +12,5 @@ namespace Blockchain.Core
     {
         public string? Address { get; set; }         
     }
+    
 }

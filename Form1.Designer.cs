@@ -17,6 +17,7 @@ partial class Form1
     // Bottoni Funzionalità (Dashboard)
     private Button btnAggiungiWallet;
     private Button btnVisualizzaTransazione;
+    private Button btnInviaTransazione;
     private Button btnVisualizzaBlockchain;
     private Button btnAnalitiche;
     private Button btnUTXOSet;
@@ -53,6 +54,7 @@ partial class Form1
 
         btnAggiungiWallet = new Button();
         btnVisualizzaTransazione = new Button();
+        btnInviaTransazione = new Button();
         btnVisualizzaBlockchain = new Button();
         btnAnalitiche = new Button();
         btnUTXOSet = new Button();
@@ -130,9 +132,10 @@ partial class Form1
         StilizzaBottoneFunzione(btnAggiungiWallet, "Wallet Disponibili", 100);
         StilizzaBottoneFunzione(btnVisualizzaTransazione, "Cronologia Transazioni", 170);
         StilizzaBottoneFunzione(btnVisualizzaBlockchain, "Visualizza Blockchain", 240);
-        StilizzaBottoneFunzione(btnAnalitiche, "Analitiche", 310);
-        StilizzaBottoneFunzione(btnUTXOSet, "UTXO Set", 380);
-        StilizzaBottoneFunzione(btncreaindirizzo, "Crea Indirizzo", 450);
+        StilizzaBottoneFunzione(btnInviaTransazione, "Invia Transazione", 310);
+        StilizzaBottoneFunzione(btnAnalitiche, "Analitiche", 380);
+        StilizzaBottoneFunzione(btnUTXOSet, "UTXO Set", 450);
+        StilizzaBottoneFunzione(btncreaindirizzo, "Crea Indirizzo", 520);
 
         // PictureBox per i grafici Python
         picGrafico.Size = new Size(500, 350);
@@ -148,6 +151,7 @@ partial class Form1
         pnlContainer.Controls.Add(btnAnalitiche);
         pnlContainer.Controls.Add(btnUTXOSet);
         pnlContainer.Controls.Add(btncreaindirizzo);
+        pnlContainer.Controls.Add(btnInviaTransazione);
 
         // Aggiunta pannelli principali al Form
         this.Controls.Add(pnlLogin); // Il login è l'ultimo aggiunto sopra gli altri

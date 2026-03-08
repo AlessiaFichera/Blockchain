@@ -18,38 +18,22 @@ namespace Blockchain.Core
     public class BlockchainManager
     {
         private List<Blocks> _chain;
-
+        private List<string> _rubricaIndirizziRete;
         public string? PortaCorrente { get; set; }
 
         // Helper per non ripetere l'URL in ogni funzione
-        private string BaseUrl => $"http://localhost:{PortaCorrente}/api";
+       private string BaseUrl => $"http://localhost:{PortaCorrente}/api";
+        public IReadOnlyList<Blocks> Chain => _chain.AsReadOnly();
+        public List<string> RubricaIndirizziRete => _rubricaIndirizziRete;
 
-/*public async Task<bool> MinaBloccoAsync()
-{
-    using (var client = new HttpClient())
-    {
-        try 
-        {
-            // Chiamata all'endpoint di mining del nodo corrente
-            var response = await client.GetAsync($"{BaseUrl}/mine");
-            return response.IsSuccessStatusCode;
-        }
-        catch (Exception ex)
-        {
-            Console.WriteLine($"Errore durante il mining: {ex.Message}");
-            return false;
-        }
-    }
-}*/
-        
         public event EventHandler<BlockAddedEventArgs>? BlockAdded;
+
 
         public BlockchainManager()
         {
             _chain = new List<Blocks>();
+            _rubricaIndirizziRete = new List<string>();
         }
-
-        public IReadOnlyList<Blocks> Chain => _chain.AsReadOnly();
 
         public async Task<List<Blocks>> SincronizzaBlockchain()
         {
@@ -94,7 +78,80 @@ namespace Blockchain.Core
         {
             BlockAdded?.Invoke(this, new BlockAddedEventArgs(block));
         }
+        public async Task SincronizzaRubricaGlobaleAsync()
+        {
+            string[] tutteLePorte = { "8080", "8081", "8082", "8083" };
+            using var client = new HttpClient();
 
+            foreach (var porta in tutteLePorte)
+            {
+                try
+                {
+                    string json = await client.GetStringAsync($"http://localhost:{porta}/api/get-addresses");
+                    var options = new JsonSerializerOptions { PropertyNameCaseInsensitive = true };
+                    var dati = JsonSerializer.Deserialize<WalletRoot>(json, options);
+                    
+                    if (dati?.Addresses != null)
+                    {
+                        foreach (var addr in dati.Addresses)
+                        {
+                            if (!_rubricaIndirizziRete.Contains(addr))
+                                _rubricaIndirizziRete.Add(addr);
+                        }
+                    }
+                }
+                catch { /* Software robusto: se un nodo è offline, proseguiamo */ }
+            }
+        }
+
+        // --- MINING E TRANSAZIONI ---
+        public async Task<bool> EseguiMiningAsync(string indirizzo)
+        {
+            using var client = new HttpClient();
+            // Incapsulamento del dato in un oggetto anonimo
+            var payload = new { address = indirizzo };
+            string jsonBody = JsonSerializer.Serialize(payload);
+            var content = new StringContent(jsonBody, Encoding.UTF8, "application/json");
+
+            var response = await client.PostAsync($"{BaseUrl}/mine", content);
+            return response.IsSuccessStatusCode;
+        }
+        public async Task<bool> InviaTransazioneAsync(string mittente, string destinatario, int ammontare)
+{
+    using (var client = new HttpClient())
+    {
+        try 
+        {
+            // 1. AUTOMAZIONE MINING (Software Durevole)
+            // Prima di inviare, eseguiamo il mining per accreditare i 10 coin al mittente
+            var payloadMine = new { address = mittente };
+            string jsonMine = JsonSerializer.Serialize(payloadMine);
+            var contentMine = new StringContent(jsonMine, Encoding.UTF8, "application/json");
+            
+            var responseMine = await client.PostAsync($"{BaseUrl}/mine", contentMine);
+            
+            if (!responseMine.IsSuccessStatusCode)
+            {
+                Console.WriteLine("Errore durante il mining preventivo.");
+                return false;
+            }
+
+            // 2. INVIO TRANSAZIONE
+            var transazione = new { from = mittente, to = destinatario, amount = ammontare };
+            string jsonBody = JsonSerializer.Serialize(transazione);
+            var contentTx = new StringContent(jsonBody, Encoding.UTF8, "application/json");
+
+            var responseTx = await client.PostAsync($"{BaseUrl}/tx", contentTx);
+            return responseTx.IsSuccessStatusCode;
+        }
+        catch (Exception ex)
+        {
+            // Software Robusto: gestione dell'eccezione in runtime
+            Console.WriteLine($"Errore critico: {ex.Message}");
+            return false;
+        }
+    }
+}
         public void EseguiAggiornamentoPython()
         {
             try
@@ -132,7 +189,7 @@ namespace Blockchain.Core
                     new Analitica { Titolo = "Mining Medio", Valore = d.tempo_medio_mining.ToString("F2") + "s" },
                     new Analitica { Titolo = "Transazioni", Valore = d.totale_transazioni.ToString() },
                     new Analitica { Titolo = "UTXO Totale", Valore = d.utxo_totale.ToString() },
-                    new Analitica { Titolo = "Valore Medio", Valore = "€" + d.valore_medio_euro.ToString("F2") }
+                    new Analitica { Titolo = "Valore Medio", Valore = d.valore_medio_btc.ToString("F2")}
                 };
             }
             catch (Exception) { return new List<Analitica>(); }
@@ -244,26 +301,5 @@ namespace Blockchain.Core
             }
         }
 
-        public async Task<bool> InviaTransazioneAsync(string mittente, string destinatario, int ammontare)
-        {
-            using (var client = new HttpClient())
-            {
-                var transazione = new { from = mittente, to = destinatario, amount = ammontare };
-
-                try 
-                {
-                    string jsonBody = JsonSerializer.Serialize(transazione);
-                    var content = new StringContent(jsonBody, Encoding.UTF8, "application/json");
-
-                    var response = await client.PostAsync($"{BaseUrl}/tx", content);
-                    return response.IsSuccessStatusCode;
-                }
-                catch (Exception ex)
-                {
-                    Console.WriteLine($"Errore: {ex.Message}");
-                    return false;
-                }
-            }
-        }
     }
 }

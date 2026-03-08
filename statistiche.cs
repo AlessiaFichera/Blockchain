@@ -19,7 +19,7 @@ public class DatiStatistici
     public double tempo_medio_mining { get; set; }
     public int totale_transazioni { get; set; }
     public int utxo_totale { get; set; }
-    public double valore_medio_euro { get; set; }
+    public double valore_medio_btc { get; set; }
 }
 
 } 

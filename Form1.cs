@@ -32,9 +32,11 @@ namespace Blockchain
             btnAnalitiche.Click += BtnAnalitiche_Click;
             btnUTXOSet.Click += BtnUTXOSet_Click;
             btncreaindirizzo.Click += btncreaindirizzo_Click;
+            btnInviaTransazione.Click += BtnInviaTransazione_Click;
         }
 
         // --- HANDLER EVENTI ---
+
         private async void Nodo_Click(object? sender, EventArgs e)
 {
     if (sender is Button btn && btn.Tag != null)
@@ -45,6 +47,38 @@ namespace Blockchain
         _blockchainManager.PortaCorrente = portaScelta;
         EntraNelNodo(portaScelta);
 
+    }
+}
+        private async void BtnInviaTransazione_Click(object? sender, EventArgs e)
+{
+    // Eseguiamo prima la parte grafica (immediata)
+    DisegnaInterfacciaInvio();
+    
+    // Poi carichiamo i dati in modo asincrono (Software Durevole)
+    await CaricaDatiPerInvio();
+}
+private async Task CaricaDatiPerInvio()
+{
+    try 
+    {
+        // 1. Sincronizziamo la rubrica di tutti i nodi (8080-8083)
+        await _blockchainManager.SincronizzaRubricaGlobaleAsync();
+        
+        // 2. Recuperiamo i TUOI indirizzi locali del nodo corrente
+        var (mieiIndirizzi, _) = await _blockchainManager.EstraiListaWallet();
+
+        // 3. Filtriamo: nel menu 'TO' mostriamo solo indirizzi NON locali
+        var destinatariEsterni = _blockchainManager.RubricaIndirizziRete
+            .Where(addr => !mieiIndirizzi.Contains(addr))
+            .ToList();
+
+        // 4. Alimentiamo i componenti (Type Safety)
+        if (_cmbFrom != null) _cmbFrom.DataSource = mieiIndirizzi;
+        if (_cmbTo != null) _cmbTo.DataSource = destinatariEsterni;
+    }
+    catch (Exception ex)
+    {
+        MessageBox.Show($"Errore nel recupero dati: {ex.Message}");
     }
 }
 
@@ -201,6 +235,7 @@ private void ConfiguraMenuNavigazione(string porta)
     AggiungiBottoneAlMenu(btnAnalitiche);
     AggiungiBottoneAlMenu(btnVisualizzaBlockchain);
     AggiungiBottoneAlMenu(btnVisualizzaTransazione);
+    AggiungiBottoneAlMenu(btnInviaTransazione);
     AggiungiBottoneAlMenu(btnAggiungiWallet);
     
     StilizzaBottoneNav(btnHome, "🏠 HOME", Color.FromArgb(45, 45, 48));
@@ -240,41 +275,55 @@ private void BtnHome_Click(object? sender, EventArgs e)
        
 // Metodo per visualizzare il nuovo indirizzo creato
         private void CaricaBlocchiGrafici(List<Blocks> catena)
+{
+    if (catena == null || catena.Count == 0) return;
+
+    pnlContainer.Controls.Clear();
+    pnlContainer.AutoScroll = true;
+
+    // Ordinamento senza =>
+    catena.Sort(delegate(Blocks a, Blocks b) {
+        return a.Height.CompareTo(b.Height);
+    });
+
+    int altezzaMassima = 0;
+    foreach (var b in catena) {
+        if (b.Height > altezzaMassima) altezzaMassima = b.Height;
+    }
+
+    int coordinataX = 20;
+
+    foreach (var bloccoDati in catena)
+    {
+        Panel bloccoGrafico = CreaSingoloBlocco(
+            bloccoDati.Timestamp.ToString(),
+            bloccoDati.Hash,
+            bloccoDati.Nonce,
+            bloccoDati.Transactions,
+            bloccoDati.Height
+        );
+
+        bloccoGrafico.Location = new Point(coordinataX, 50);
+        pnlContainer.Controls.Add(bloccoGrafico);
+
+        if (bloccoDati.Height < altezzaMassima)
         {
-            pnlContainer.Controls.Clear();
-            pnlContainer.AutoScroll = true;
-            int coordinataX = 20;
-
-
-            foreach (var bloccoDati in catena)
+            Label freccia = new Label
             {
-                Panel bloccoGrafico = CreaSingoloBlocco(
-                    bloccoDati.Timestamp.ToString(),
-                    bloccoDati.Hash,
-                    bloccoDati.Nonce,
-                    bloccoDati.Transactions,
-                    bloccoDati.Height
-                    );
-
-                bloccoGrafico.Location = new Point(coordinataX, 100);
-                pnlContainer.Controls.Add(bloccoGrafico);
-
-                if (bloccoDati.Height < catena.Count - 1)
-                {
-                    Label freccia = new Label
-                    {
-                        Text = "➔",
-                        ForeColor = Color.FromArgb(41, 171, 226),
-                        Font = new Font("Segoe UI", 20, FontStyle.Bold),
-                        Location = new Point(coordinataX + 215, 170),
-                        AutoSize = true
-                    };
-                    pnlContainer.Controls.Add(freccia);
-                }
-                coordinataX += 280;
-            }
+                Text = "➔",
+                ForeColor = Color.FromArgb(41, 171, 226),
+                Font = new Font("Segoe UI", 20, FontStyle.Bold),
+                Location = new Point(coordinataX + 230, 180), 
+                AutoSize = true,
+                BackColor = Color.Transparent
+            };
+            pnlContainer.Controls.Add(freccia);
+            freccia.BringToFront();
         }
 
+        coordinataX += 285; 
+    }
+}
        private Panel CreaSingoloBlocco(string timestamp, string hash, int nonce, List<TransactionData>? transactions, int height)
 {
 
@@ -356,11 +405,6 @@ FlowLayoutPanel flowTrans = new FlowLayoutPanel {
     }
 }
 
-
-
-   
-
-    
     Label lblNonce = new Label
     {
         Text = "Nonce: " + nonce,
@@ -398,7 +442,6 @@ private async void LinkTransazione_Click(object? sender, EventArgs e)
             {
                 if (b.Transactions != null)
                 {
-                    // CICLO 2: Esaminiamo ogni transazione dentro il blocco (Senza =>)
                     foreach (TransactionData t in b.Transactions)
                     {
                         if (t.id == idCercato)
@@ -414,7 +457,6 @@ private async void LinkTransazione_Click(object? sender, EventArgs e)
             if (txTrovata != null)
             {
                 PreparaAreaLavoro("DETTAGLIO TRANSAZIONE");
-                // Riutilizzo del componente grafico
                 TransazioniGrafiche(new List<TransactionData> { txTrovata });
             }
             else
@@ -516,111 +558,136 @@ private async void LinkTransazione_Click(object? sender, EventArgs e)
             ForeColor = Color.White,
             Font = new Font("Consolas", 10), 
             Location = new Point(15, 35),
-            Size = new Size(walletCard.Width - 200, 30), // Ridotto per far spazio al bottone
+            Size = new Size(walletCard.Width - 200, 30), 
             TextAlign = ContentAlignment.MiddleLeft
-        };
-
-        // Componente Bottone per l'invio (Orientamento ai Componenti)
-        Button btnInvia = new Button
-        {
-            Text = "INVIA",
-            Size = new Size(120, 40),
-            Location = new Point(walletCard.Width - 140, 20),
-            BackColor = Color.FromArgb(0, 122, 204),
-            ForeColor = Color.White,
-            FlatStyle = FlatStyle.Flat,
-            Font = new Font("Segoe UI", 9, FontStyle.Bold),
-            Cursor = Cursors.Hand,
-            Tag = wallet // Utilizziamo il Tag per trasportare l'indirizzo
-        };
-
-        // Sottoscrizione all'evento 
-        btnInvia.Click += (s, e) => {
-             if (s is Button b && b.Tag != null)
-             {
-                 MostraSchermataDettaglioInvio(b.Tag.ToString()!);
-             }
         };
 
         walletCard.Controls.Add(lblTag);
         walletCard.Controls.Add(lblAddress);
-        walletCard.Controls.Add(btnInvia);
         pnlContainer.Controls.Add(walletCard);
 
         coordinataY += 95; 
     }
 }
-// Componente di classe per l'ammontare (Orientamento ai Componenti)
+ private ComboBox? _cmbFrom;
+private ComboBox? _cmbTo;
 private ComboBox? _selezioneImporto;
-private void MostraSchermataDettaglioInvio(string destinatario)
+private void DisegnaInterfacciaInvio()
 {
     pnlContainer.Controls.Clear();
 
-    Label lblDest = new Label {
-        Text = $"INVIO A: {destinatario}",
-        ForeColor = Color.White,
-        Font = new Font("Segoe UI", 12, FontStyle.Bold),
-        Location = new Point(30, 30),
-        AutoSize = true
-    };
+    _cmbFrom = new ComboBox { 
+        Location = new Point(30, 60), 
+        Size = new Size(400, 30), 
+        DropDownStyle = ComboBoxStyle.DropDownList, 
+        BackColor = Color.White };
 
-    // Inizializzazione del componente di classe
-    _selezioneImporto = new ComboBox {
-        Location = new Point(30, 80),
-        Size = new Size(150, 30),
-        DropDownStyle = ComboBoxStyle.DropDownList,
-        BackColor = Color.White
+    _cmbTo = new ComboBox { 
+        Location = new Point(30, 130),
+        Size = new Size(400, 30), 
+        DropDownStyle = ComboBoxStyle.DropDownList, 
+        BackColor = Color.White };
+    
+    // Menu a tendina per l'importo (da 1 a 10)
+    _selezioneImporto = new ComboBox { 
+        Location = new Point(30, 200), 
+        Size = new Size(150, 30), 
+        DropDownStyle = ComboBoxStyle.DropDownList, 
+        BackColor = Color.White 
     };
     for (int i = 1; i <= 10; i++) _selezioneImporto.Items.Add(i);
     _selezioneImporto.SelectedIndex = 0;
 
-    Button btnConferma = new Button {
-        Text = "CONFERMA TRANSAZIONE",
-        Location = new Point(30, 130),
-        Size = new Size(200, 45),
-        BackColor = Color.SeaGreen,
+    // 2. BOTTONE 1: SOLO MINING (Per caricare i soldi)
+    Button btnSoloMining = new Button {
+        Text = "1. ESEGUI MINING",
+        Location = new Point(30, 250),
+        Size = new Size(190, 45),
+        BackColor = Color.Orange,
+        FlatStyle = FlatStyle.Flat,
+        Font = new Font("Segoe UI", 9, FontStyle.Bold),
+        Cursor = Cursors.Hand
+    };
+    btnSoloMining.Click += BtnSoloMining_Click;
+
+    // 3. BOTTONE 2: SOLO INVIA (Per spedire i soldi minati)
+    Button btnSoloInvia = new Button {
+        Text = "2. INVIA TRANSAZIONE",
+        Location = new Point(240, 250),
+        Size = new Size(190, 45),
+        BackColor = Color.DodgerBlue,
         ForeColor = Color.White,
         FlatStyle = FlatStyle.Flat,
-        Tag = destinatario // Trasporto dati tramite oggetto Tag
+        Font = new Font("Segoe UI", 9, FontStyle.Bold),
+        Cursor = Cursors.Hand
     };
+    btnSoloInvia.Click += BtnSoloInvia_Click;
 
-    // Sottoscrizione formale all'evento (Concetto di prima classe)
-    btnConferma.Click += BtnConferma_Click;
-
-    pnlContainer.Controls.Add(lblDest);
+    // 4. Aggiunta etichette e controlli al pannello
+    pnlContainer.Controls.Add(new Label { 
+        Text = "DA (Mio Wallet):", 
+        Location = new Point(30, 40), 
+        ForeColor = Color.White, AutoSize = true });
+    pnlContainer.Controls.Add(_cmbFrom);
+    
+    pnlContainer.Controls.Add(new Label { 
+        Text = "A (Destinatario):", 
+        Location = new Point(30, 110), 
+        ForeColor = Color.White, AutoSize = true });
+    pnlContainer.Controls.Add(_cmbTo);
+    
+    pnlContainer.Controls.Add(new Label { 
+        Text = "QUANTITÀ (Coin):", 
+        Location = new Point(30, 180), 
+        ForeColor = Color.White, AutoSize = true });
     pnlContainer.Controls.Add(_selezioneImporto);
-    pnlContainer.Controls.Add(btnConferma);
+    
+    pnlContainer.Controls.Add(btnSoloMining);
+    pnlContainer.Controls.Add(btnSoloInvia);
 }
-private async void BtnConferma_Click(object? sender, EventArgs e)
+
+private async void BtnSoloMining_Click(object? sender, EventArgs e)
 {
-    // Validazione per evitare dereferenziazione nulla (Software Robusto)
-    if (_selezioneImporto?.SelectedItem == null) return;
+    if (_cmbFrom?.SelectedItem == null) return;
+    string indirizzo = _cmbFrom.SelectedItem.ToString()!;
 
-    if (sender is Button btn && btn.Tag != null)
+    bool successo = await _blockchainManager.EseguiMiningAsync(indirizzo);
+    
+    if (successo) 
+        MessageBox.Show($"Mining riuscito per {indirizzo}. Ora hai 10 coin in più!");
+    else 
+        MessageBox.Show("Errore nel mining. Controlla il terminale del nodo Go.");
+}
+
+
+private async void BtnSoloInvia_Click(object? sender, EventArgs e)
+{
+    // 1. Validazione iniziale (Software Robusto)
+    if (_cmbFrom?.SelectedItem == null || _cmbTo?.SelectedItem == null || _selezioneImporto?.SelectedItem == null)
     {
-        // Recupero sicuro dei dati dal componente
-        string destinatario = btn.Tag.ToString()!;
-        int ammontare = (int)_selezioneImporto.SelectedItem;
-        string mittente = "1FJxTcQfU7U5MGwz31LGZwqafgWAtqi2kj";
+        MessageBox.Show("Seleziona mittente, destinatario e importo!");
+        return;
+    }
 
-        try 
-        {
-            // Chiamata asincrona al manager per preservare l'investimento
-            bool esito = await _blockchainManager.InviaTransazioneAsync(mittente, destinatario, ammontare);
-            
-            if (esito) 
-                MessageBox.Show("Transazione inviata al nodo Go!", "Blockchain Update", MessageBoxButtons.OK, MessageBoxIcon.Information);
-            else 
-                MessageBox.Show("Errore nell'invio. Verifica il server Go.", "Errore Runtime", MessageBoxButtons.OK, MessageBoxIcon.Error);
-        }
-        catch (Exception ex)
-        {
-            // Gestione errori per un software durevole
-            MessageBox.Show($"Eccezione in fase di esecuzione: {ex.Message}");
-        }
+    string from = _cmbFrom.SelectedItem.ToString()!;
+    string to = _cmbTo.SelectedItem.ToString()!;
+    
+
+    int ammontare = Convert.ToInt32(_selezioneImporto.SelectedItem);
+
+    bool successo = await _blockchainManager.InviaTransazioneAsync(from, to, ammontare);
+
+    if (successo)
+    {
+        MessageBox.Show("Transazione inviata con successo!");
+    }
+    else
+    {
+        MessageBox.Show("Errore nell'invio. Verifica se hai minato abbastanza coin prima!");
     }
 }
 
+    
        private void TransazioniGrafiche(List<TransactionData> transazioni)
 {
     pnlContainer.Controls.Clear();
