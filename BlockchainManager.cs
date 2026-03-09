@@ -174,26 +174,46 @@ namespace Blockchain.Core
         }
 
         public List<Analitica> EstraiAnalitiche(string jsonRicevuto)
-        {
-            try
-            {
-                var root = JsonSerializer.Deserialize<StatisticheRoot>(jsonRicevuto);
-                if (root == null || root.statistiche == null)
-                {
-                    return new List<Analitica>();
-                }
-                var d = root.statistiche;
+{
+    try
+    {
+        var options = new JsonSerializerOptions { PropertyNameCaseInsensitive = true };
+        var root = JsonSerializer.Deserialize<StatisticheRoot>(jsonRicevuto, options);
+        
+        if (root?.statistiche == null) return new List<Analitica>();
+        
+        var d = root.statistiche;
 
-                return new List<Analitica>
+        var lista = new List<Analitica>
+        {
+            new Analitica { Titolo = "Mining Medio",Valore = d.tempo_medio_mining.ToString("F2") + "s" },
+            new Analitica { Titolo = "Transazioni", Valore = d.totale_transazioni.ToString() },
+            new Analitica { Titolo = "Difficoltà Media", Valore = d.difficolta_media.ToString() },
+            new Analitica { Titolo = "Valore Medio", Valore = d.valore_medio_btc.ToString("F2") }
+        };
+
+        if (d.top_ricchi != null)
+        {
+            string classifica = "";
+            foreach (var record in d.top_ricchi)
+            {
+                if (record.Count >= 2)
                 {
-                    new Analitica { Titolo = "Mining Medio", Valore = d.tempo_medio_mining.ToString("F2") + "s" },
-                    new Analitica { Titolo = "Transazioni", Valore = d.totale_transazioni.ToString() },
-                    new Analitica { Titolo = "UTXO Totale", Valore = d.utxo_totale.ToString() },
-                    new Analitica { Titolo = "Valore Medio", Valore = d.valore_medio_btc.ToString("F2")}
-                };
+                    // Usiamo ?.ToString() ?? "" per evitare il null
+                    string indirizzo = record[0]?.ToString() ?? "Unknown";
+                    string val = record[1]?.ToString() ?? "0";
+                    
+                    string indirizzo_corto = indirizzo.Length > 40 ? indirizzo.Substring(0, 40) : indirizzo;
+                    classifica += $"{indirizzo_corto}: {val} BTC\n";
+                }
             }
-            catch (Exception) { return new List<Analitica>(); }
+            lista.Add(new Analitica { Titolo = "Indirizzi più ricchi", Valore = classifica });
         }
+
+        return lista;
+    }
+    catch (Exception) { return new List<Analitica>(); }
+}
 
         public async Task<(List<string> Lista, int Totale)> EstraiListaWallet() 
         {

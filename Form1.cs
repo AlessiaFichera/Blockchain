@@ -272,8 +272,6 @@ private void BtnHome_Click(object? sender, EventArgs e)
     pnlContainer.Controls.Clear();
 }
    
-       
-// Metodo per visualizzare il nuovo indirizzo creato
         private void CaricaBlocchiGrafici(List<Blocks> catena)
 {
     if (catena == null || catena.Count == 0) return;
@@ -281,7 +279,6 @@ private void BtnHome_Click(object? sender, EventArgs e)
     pnlContainer.Controls.Clear();
     pnlContainer.AutoScroll = true;
 
-    // Ordinamento senza =>
     catena.Sort(delegate(Blocks a, Blocks b) {
         return a.Height.CompareTo(b.Height);
     });
@@ -470,50 +467,125 @@ private async void LinkTransazione_Click(object? sender, EventArgs e)
         }
     }
 }
-        private void VisualizzaStatistiche(string jsonContenuto)
+       private void VisualizzaStatistiche(string jsonContenuto)
+{
+   pnlContainer.Controls.Clear();
+    var stats = _blockchainManager.EstraiAnalitiche(jsonContenuto);
+    if (stats == null || stats.Count == 0) return;
+
+    int coordinataX = 20;
+    pnlContainer.AutoScroll = true;
+
+    List<Analitica> altreStats = new List<Analitica>();
+    Analitica? statRicchi = null;
+
+    foreach (var s in stats)
+    {
+        if (s.Titolo.Contains("Ricchi") || s.Titolo.Contains("Indirizzi"))
         {
-            pnlContainer.Controls.Clear();
-            var stats = _blockchainManager.EstraiAnalitiche(jsonContenuto);
-            int coordinataX = 20;
-            pnlContainer.AutoScroll = true;
-
-            foreach (var s in stats)
-            {
-                Panel card = new Panel
-                {
-                    Size = new Size(170, 100),
-                    Location = new Point(coordinataX, 50),
-                    BackColor = Color.White,
-                    BorderStyle = BorderStyle.FixedSingle
-                };
-
-                Label lbl = new Label
-                {
-                    Text = $"{s.Titolo}\n{s.Valore}",
-                    Dock = DockStyle.Fill,
-                    TextAlign = ContentAlignment.MiddleCenter,
-                    Font = new Font("Segoe UI", 10, FontStyle.Bold)
-                };
-
-                card.Controls.Add(lbl);
-                pnlContainer.Controls.Add(card);
-                coordinataX += 190;
-            }
-
-            string percorsoImmagine = "grafico_blockchain.png";
-            if (File.Exists(percorsoImmagine))
-            {
-                PictureBox pic = new PictureBox
-                {
-                    Image = Image.FromFile(percorsoImmagine),
-                    Location = new Point(20, 180),
-                    Size = new Size(700, 350),
-                    SizeMode = PictureBoxSizeMode.Zoom,
-                    BorderStyle = BorderStyle.None
-                };
-                pnlContainer.Controls.Add(pic);
-            }
+            statRicchi = s;
         }
+        else
+        {
+            altreStats.Add(s);
+        }
+    }
+
+   foreach (var s in altreStats)
+{
+    Panel card = new Panel
+    {
+        Size = new Size(170, 100),
+        Location = new Point(coordinataX, 50),
+        BackColor = Color.White,
+        BorderStyle = BorderStyle.FixedSingle
+    };
+
+    // Label per il TITOLO (Sempre Blu)
+    Label lblTitolo = new Label
+    {
+        Text = s.Titolo.ToUpper(),
+        Dock = DockStyle.Top,
+        Height = 40,
+        TextAlign = ContentAlignment.BottomCenter,
+        Font = new Font("Segoe UI", 9, FontStyle.Bold),
+        ForeColor = Color.Blue 
+    };
+
+    Label lblValore = new Label
+    {
+        Text = s.Valore,
+        Dock = DockStyle.Fill,
+        TextAlign = ContentAlignment.TopCenter,
+        Font = new Font("Segoe UI", 11, FontStyle.Bold),
+        ForeColor = Color.Black 
+    };
+
+    card.Controls.Add(lblValore);
+    card.Controls.Add(lblTitolo);
+    
+    pnlContainer.Controls.Add(card);
+    coordinataX += 190;
+}
+
+    int yOffset = 180;
+    if (statRicchi != null)
+    {
+        Panel leaderboard = new Panel
+        {
+            Size = new Size(500, 140),
+            Location = new Point(120, yOffset),
+            BackColor = Color.White,
+            BorderStyle = BorderStyle.FixedSingle
+        };
+
+        Label lblTitolo = new Label
+        {
+            Text = "🏆 TOP 3 INDIRIZZI PIÙ RICCHI",
+            Dock = DockStyle.Top,
+            Height = 30,
+            TextAlign = ContentAlignment.MiddleCenter,
+            Font = new Font("Segoe UI", 10, FontStyle.Bold),
+            ForeColor = Color.Blue
+        };
+
+        Label lblDati = new Label
+        {
+            Text = statRicchi.Valore,
+            Dock = DockStyle.Fill,
+            TextAlign = ContentAlignment.MiddleCenter,
+            Font = new Font("Consolas", 9, FontStyle.Bold),
+            ForeColor = Color.Black
+        };
+
+        leaderboard.Controls.Add(lblDati);
+        leaderboard.Controls.Add(lblTitolo);
+        pnlContainer.Controls.Add(leaderboard);
+        
+        yOffset += 160; 
+    }
+
+    Size sizeGrafico1 = new Size(700, 400);
+     Size sizeGrafico = new Size(700, 350);
+    AggiungiGrafico("grafico_blockchain.png", yOffset, sizeGrafico1);
+    AggiungiGrafico("grafico_nonce.png", yOffset + 450, sizeGrafico);
+}
+
+// Metodo di supporto per i grafici
+private void AggiungiGrafico(string path, int y, Size size)
+{
+    if (File.Exists(path))
+    {
+        PictureBox pic = new PictureBox
+        {
+            Image = Image.FromFile(path),
+            Location = new Point(20, y),
+            Size = size,
+            SizeMode = PictureBoxSizeMode.Zoom
+        };
+        pnlContainer.Controls.Add(pic);
+    }
+}
 
     private void CaricaWalletGrafici(List<string> walletList, int count)
 {
