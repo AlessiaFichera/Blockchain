@@ -21,7 +21,10 @@ partial class Form1
     private Button btnVisualizzaBlockchain;
     private Button btnAnalitiche;
     private Button btnUTXOSet;
-    private Button btncreaindirizzo;
+    private Button btncreaindirizzo; 
+    private Button btnMining;   
+    private Button btnIndietroWallet;
+    private Button btnIndietroBlockchain;
 
     // Bottoni Selezione Account (Login)
     private Button btnNode1;
@@ -58,8 +61,10 @@ partial class Form1
         btnVisualizzaBlockchain = new Button();
         btnAnalitiche = new Button();
         btnUTXOSet = new Button();
+        btnMining = new Button();
         btncreaindirizzo = new Button();
-
+        btnIndietroWallet = new Button();
+        btnIndietroBlockchain = new Button();
         btnNode1 = new Button();
         btnNode2 = new Button();
         btnNode3 = new Button();
@@ -86,7 +91,7 @@ partial class Form1
         lblSeleziona.Location = new Point(230, 100);
         lblSeleziona.AutoSize = true;
 
-        StilizzaBottoneLogin(btnNode1, "ACCEDI AL CENTRALNODE: 8080", 200);
+        StilizzaBottoneLogin(btnNode1, "ACCEDI AL NODO: 8080", 200);
         StilizzaBottoneLogin(btnNode2, "ACCEDI AL NODO: 8081", 270);
         StilizzaBottoneLogin(btnNode3, "ACCEDI AL NODO: 8082", 340);
         StilizzaBottoneLogin(btnNode4, "ACCEDI AL NODO: 8083", 410);
@@ -136,6 +141,7 @@ partial class Form1
         StilizzaBottoneFunzione(btnAnalitiche, "Analitiche", 380);
         StilizzaBottoneFunzione(btnUTXOSet, "UTXO Set", 450);
         StilizzaBottoneFunzione(btncreaindirizzo, "Crea Indirizzo", 520);
+        StilizzaBottoneFunzione(btnMining, "Mining", 590);
 
         // PictureBox per i grafici Python
         picGrafico.Size = new Size(500, 350);
@@ -152,6 +158,7 @@ partial class Form1
         pnlContainer.Controls.Add(btnUTXOSet);
         pnlContainer.Controls.Add(btncreaindirizzo);
         pnlContainer.Controls.Add(btnInviaTransazione);
+        pnlContainer.Controls.Add(btnMining);
 
         // Aggiunta pannelli principali al Form
         this.Controls.Add(pnlLogin); // Il login è l'ultimo aggiunto sopra gli altri

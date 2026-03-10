@@ -78,31 +78,44 @@ namespace Blockchain.Core
         {
             BlockAdded?.Invoke(this, new BlockAddedEventArgs(block));
         }
-        public async Task SincronizzaRubricaGlobaleAsync()
-        {
-            string[] tutteLePorte = { "8080", "8081", "8082", "8083" };
-            using var client = new HttpClient();
+      public async Task<List<string>> SincronizzaRubricaGlobaleAsync()
+{
+    string[] tutteLePorte = { "8080", "8081", "8082", "8083" };
+    using var client = new HttpClient();
 
-            foreach (var porta in tutteLePorte)
+    // Impostiamo un timeout breve (es. 2 secondi) per non bloccare l'interfaccia
+    client.Timeout = TimeSpan.FromSeconds(1);
+
+    foreach (var porta in tutteLePorte)
+    {
+        try
+        {
+            string json = await client.GetStringAsync($"http://localhost:{porta}/api/get-addresses");
+            var options = new JsonSerializerOptions { PropertyNameCaseInsensitive = true };
+            var dati = JsonSerializer.Deserialize<WalletRoot>(json, options);
+            
+            if (dati?.Addresses != null)
             {
-                try
+                foreach (var indirizzo in dati.Addresses)
                 {
-                    string json = await client.GetStringAsync($"http://localhost:{porta}/api/get-addresses");
-                    var options = new JsonSerializerOptions { PropertyNameCaseInsensitive = true };
-                    var dati = JsonSerializer.Deserialize<WalletRoot>(json, options);
-                    
-                    if (dati?.Addresses != null)
+                    // Se l'indirizzo non è già presente, lo aggiungiamo alla rubrica condivisa
+                    if (!_rubricaIndirizziRete.Contains(indirizzo))
                     {
-                        foreach (var addr in dati.Addresses)
-                        {
-                            if (!_rubricaIndirizziRete.Contains(addr))
-                                _rubricaIndirizziRete.Add(addr);
-                        }
+                        _rubricaIndirizziRete.Add(indirizzo);
                     }
                 }
-                catch { /* Software robusto: se un nodo è offline, proseguiamo */ }
             }
         }
+        catch (Exception ex)
+        {
+            // Software Robusto: segnaliamo l'errore nel terminale ma continuiamo il ciclo
+            Console.WriteLine($"Nodo sulla porta {porta} non raggiungibile: {ex.Message}");
+        }
+    }
+
+    // Restituiamo la lista completa aggiornata
+    return _rubricaIndirizziRete.ToList();
+}
 
         // --- MINING E TRANSAZIONI ---
         public async Task<bool> EseguiMiningAsync(string indirizzo)
@@ -122,21 +135,6 @@ namespace Blockchain.Core
     {
         try 
         {
-            // 1. AUTOMAZIONE MINING (Software Durevole)
-            // Prima di inviare, eseguiamo il mining per accreditare i 10 coin al mittente
-            var payloadMine = new { address = mittente };
-            string jsonMine = JsonSerializer.Serialize(payloadMine);
-            var contentMine = new StringContent(jsonMine, Encoding.UTF8, "application/json");
-            
-            var responseMine = await client.PostAsync($"{BaseUrl}/mine", contentMine);
-            
-            if (!responseMine.IsSuccessStatusCode)
-            {
-                Console.WriteLine("Errore durante il mining preventivo.");
-                return false;
-            }
-
-            // 2. INVIO TRANSAZIONE
             var transazione = new { from = mittente, to = destinatario, amount = ammontare };
             string jsonBody = JsonSerializer.Serialize(transazione);
             var contentTx = new StringContent(jsonBody, Encoding.UTF8, "application/json");
@@ -146,7 +144,6 @@ namespace Blockchain.Core
         }
         catch (Exception ex)
         {
-            // Software Robusto: gestione dell'eccezione in runtime
             Console.WriteLine($"Errore critico: {ex.Message}");
             return false;
         }
@@ -189,7 +186,7 @@ namespace Blockchain.Core
             new Analitica { Titolo = "Mining Medio",Valore = d.tempo_medio_mining.ToString("F2") + "s" },
             new Analitica { Titolo = "Transazioni", Valore = d.totale_transazioni.ToString() },
             new Analitica { Titolo = "Difficoltà Media", Valore = d.difficolta_media.ToString() },
-            new Analitica { Titolo = "Valore Medio", Valore = d.valore_medio_btc.ToString("F2") }
+            new Analitica { Titolo = "Valore Medio Utxo", Valore = d.valore_medio_btc.ToString("F2")+ " BTC" }
         };
 
         if (d.top_ricchi != null)
@@ -199,7 +196,6 @@ namespace Blockchain.Core
             {
                 if (record.Count >= 2)
                 {
-                    // Usiamo ?.ToString() ?? "" per evitare il null
                     string indirizzo = record[0]?.ToString() ?? "Unknown";
                     string val = record[1]?.ToString() ?? "0";
                     
@@ -320,6 +316,35 @@ namespace Blockchain.Core
                 return "Errore: " + ex.Message;
             }
         }
+      public async Task<(string indirizzo, string saldo)> OttieniSaldoCompletoAsync(string indirizzoRichiesto)
+{
+    using var client = new HttpClient();
+    
+    try
+    {
+        string url = $"http://localhost:8080/api/get-balance?address={indirizzoRichiesto}";
+        string json = await client.GetStringAsync(url);
+        
+        var options = new JsonSerializerOptions { PropertyNameCaseInsensitive = true };
+        BalanceResponse? risposta = JsonSerializer.Deserialize<BalanceResponse>(json, options);
+
+        if (risposta != null)
+        {
+            // Percorso 1: Successo
+            return (risposta.Address, risposta.Result);
+        }
+        
+        // Percorso 2: Risposta nulla (fallback)
+        return (indirizzoRichiesto, "0");
+    }
+    catch (Exception ex)
+    {
+        // Percorso 3: Eccezione (Errore di rete o server)
+        // Software Robusto: gestiamo il runtime senza crash
+        Console.WriteLine($"Errore critico nel recupero saldo: {ex.Message}");
+        return (indirizzoRichiesto, "N/D"); 
+    }
+}
 
     }
 }
