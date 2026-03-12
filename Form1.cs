@@ -64,10 +64,26 @@ namespace Blockchain
 {
     // Recuperiamo la lista aggiornata direttamente dal metodo
     List<string> rubricaAggiornata = await _blockchainManager.SincronizzaRubricaGlobaleAsync();
-    
-    // Recuperiamo i tuoi wallet
-    var (mieiIndirizzi, _) = await _blockchainManager.EstraiListaWallet();
 
+    // Recuperiamo i tuoi wallet come oggetto WalletRoot
+    WalletRoot? mieiWallet = await _blockchainManager.EstraiListaWallet();
+
+        if (mieiWallet?.Addresses == null)
+        {
+            MessageBox.Show("Errore nel recupero dei wallet.");
+            return;
+        }
+
+    // Dichiariamo la lista dei miei indirizzi
+    List<string> mieiIndirizzi = new List<string>();
+
+    // Se l'oggetto WalletRoot e la lista di Addresses non sono null, popoliamo la lista
+    if (mieiWallet != null && mieiWallet.Addresses != null)
+    {
+        mieiIndirizzi = mieiWallet.Addresses;
+    }
+
+    // Creiamo la lista dei destinatari esterni
     List<string> destinatariEsterni = new List<string>();
     foreach (string addr in rubricaAggiornata)
     {
@@ -77,8 +93,15 @@ namespace Blockchain
         }
     }
 
-    _selezioneFrom?.DataSource = mieiIndirizzi;
-    _selezioneTo?.DataSource = destinatariEsterni;
+    // Assegniamo i valori ai controlli UI, se non sono null
+    if (_selezioneFrom != null)
+    {
+        _selezioneFrom.DataSource = mieiIndirizzi;
+    }
+    if (_selezioneTo != null)
+    {
+        _selezioneTo.DataSource = destinatariEsterni;
+    }
 }
 
         private async void BtnVisualizzaBlockchain_Click(object? sender, EventArgs e)
@@ -117,7 +140,7 @@ namespace Blockchain
         private async void BtnMining_Click(object? sender, EventArgs e)
         {
             PreparaAreaLavoro("MINING");
-            DisegnaSezioneMining();
+            await DisegnaSezioneMining();
         }
 
        private async void BtnAggiungiWallet_Click(object? sender, EventArgs e)
@@ -126,12 +149,22 @@ namespace Blockchain
 
     try
     {
-        // Riceviamo la tupla (Lista e Conteggio) dal manager
-        var (listaWallet, totale) = await _blockchainManager.EstraiListaWallet();
+         WalletRoot walletData = await _blockchainManager.EstraiListaWallet();
+         if (walletData != null)
+            {
+                if (walletData.Addresses == null || walletData.Addresses.Count == 0)
+                {
+                    MessageBox.Show("Nessun wallet trovato nel nodo Go.");
+                    return;
+                }
+            }
+            else
+            {
+                MessageBox.Show("Errore nel recupero dei wallet.");
+                return;
+            }
 
-
-        // Passiamo la lista al metodo che gestisce la parte grafica
-        CaricaWalletGrafici(listaWallet, totale);
+        CaricaWalletGrafici(walletData.Addresses, walletData.Count);
     }
     catch (Exception ex)
     {
@@ -174,8 +207,8 @@ namespace Blockchain
               PreparaAreaLavoro("UTXOSET");
             try
             {
-                 var (count, utxoSet)  = await _blockchainManager.EstraiUTXOSet();
-                VisualizzaUTXOSet(count, utxoSet);
+                UtxoResponse risposta = await _blockchainManager.EstraiUTXOSet();
+                VisualizzaUTXOSet(risposta.count, risposta.Utxos);
             }
             catch (Exception ex)
             {
@@ -677,10 +710,24 @@ private async void BtnSaldo_Click(object? sender, EventArgs e)
 {
     if (sender is Button btn && btn.Tag is string indirizzo)
     {
-        // 1. Chiamata al BlockchainManager (Software Robusto: asincrono)
-        var (wallet, saldo) = await _blockchainManager.OttieniSaldoCompletoAsync(indirizzo);
+        BalanceResponse risposta = await _blockchainManager.OttieniSaldoCompletoAsync(indirizzo);
 
-        // 2. Chiamiamo la funzione per disegnare la nuova schermata
+        string wallet = "";
+        string saldo = "0";
+
+        if (risposta != null)
+        {
+            if (risposta.Address != null)
+            {
+                wallet = risposta.Address;
+            }
+
+            if (risposta.Result != null)
+            {
+                saldo = risposta.Result;
+            }
+        }
+
         VisualizzaDettaglioSaldo(wallet, saldo);
     }
 }
@@ -855,7 +902,7 @@ private async void BtnSoloInvia_Click(object? sender, EventArgs e)
     }
 }
 
-private async void DisegnaSezioneMining()
+private async Task DisegnaSezioneMining()
 {
     pnlContainer.Controls.Clear();
     pnlContainer.BackColor = Color.FromArgb(30, 33, 40); 
@@ -863,7 +910,7 @@ private async void DisegnaSezioneMining()
     Label lblTitolo = new Label {
         Text = "SCEGLI TRA I TUOI INDIRIZZI CHI DEVE ESSERE MINER:",
         Font = new Font("Segoe UI", 14, FontStyle.Bold),
-        ForeColor = Color.White, // Testo chiaro su fondo scuro
+        ForeColor = Color.White, 
         Location = new Point(30, 20),
         AutoSize = true
     };
@@ -875,9 +922,16 @@ private async void DisegnaSezioneMining()
         Font = new Font("Segoe UI", 10)
     };
 
-    // SOLUZIONE LISTA: Se la tendina è vuota, carichiamo i dati dal nodo Go
-    var (mieiIndirizzi, _) = await _blockchainManager.EstraiListaWallet();
-    _selezioneFrom.DataSource = mieiIndirizzi;
+    
+    // Recuperiamo i tuoi wallet come oggetto WalletRoot
+    WalletRoot mieiWallet = await _blockchainManager.EstraiListaWallet();
+    if (mieiWallet != null && mieiWallet.Addresses != null)
+    {
+     List<string> mieiIndirizzi = mieiWallet.Addresses;
+     _selezioneFrom.DataSource = mieiIndirizzi;
+    }
+
+   
 
     Button btnSoloMining = new Button {
         Text = "ESEGUI MINING",
