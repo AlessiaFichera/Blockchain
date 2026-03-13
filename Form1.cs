@@ -3,15 +3,18 @@ using System.Drawing;
 using System.Windows.Forms;
 using System.Collections.Generic;
 using Blockchain.Core;
-using System.IO;
 using System.Text.Json;
 
 namespace Blockchain
 {
     public partial class Form1 : Form
     {
-        // 1. Orientamento ai Componenti: gestore della logica come campo privato
+        // Campi
         private readonly BlockchainManager _blockchainManager;
+         private ComboBox? _selezioneFrom;
+        private ComboBox? _selezioneTo;
+        private ComboBox? _selezioneImporto;
+
 
         public Form1()
         {
@@ -41,11 +44,11 @@ namespace Blockchain
 
         // --- HANDLER EVENTI ---
 
-        private async void Nodo_Click(object? sender, EventArgs e)
+        private  void Nodo_Click(object? sender, EventArgs e)
 {
     if (sender is Button btn && btn.Tag != null)
     {
-        string portaScelta = btn.Tag.ToString()!;
+        string portaScelta = btn.Tag.ToString()??"";
         
         // 1. Impostiamo la porta
         _blockchainManager.PortaCorrente = portaScelta;
@@ -801,9 +804,7 @@ private void VisualizzaDettaglioSaldo(string indirizzo, string saldo)
     btnIndietroWallet.Visible = true;
     
 }
- private ComboBox? _selezioneFrom;
-private ComboBox? _selezioneTo;
-private ComboBox? _selezioneImporto;
+
 private void DisegnaInterfacciaInvio()
 {
     pnlContainer.Controls.Clear();

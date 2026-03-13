@@ -11,7 +11,7 @@ namespace Blockchain.Core
     public class BlockchainManager
     {
         // Dati principali
-        private List<Blocks> _chain;
+       
         // Rubrica globale degli indirizzi (aggiornata periodicamente)
         private List<string> _rubricaIndirizziRete;
         // Porta del nodo Go attualmente in uso (corrispondente all'account selezionato)
@@ -24,6 +24,8 @@ namespace Blockchain.Core
                 return "http://localhost:" + PortaCorrente + "/api";
             }
         }
+        
+        private List<Blocks> _chain;
         // Proprietà di sola lettura per accedere alla blockchain e alla rubrica degli indirizzi
         public IReadOnlyList<Blocks> Chain
         {
@@ -33,13 +35,7 @@ namespace Blockchain.Core
             }
         }
 
-        public IReadOnlyList<string> RubricaIndirizziRete
-        {
-            get
-            {
-                return _rubricaIndirizziRete.AsReadOnly();
-            }
-        }
+        
         // Evento per notificare l'aggiunta di un nuovo blocco alla blockchain
         public event EventHandler<BlockAddedEventArgs>? BlockAdded;
         // Costruttore che inizializza la blockchain e la rubrica degli indirizzi
