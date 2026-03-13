@@ -9,7 +9,7 @@ class BlockchainStats:
             full_data = json.loads(json_data)
             # La chiave nel tuo JSON è "blocks"
             self.data = full_data.get('blocks', [])
-            print(f"DEBUG: Caricati {len(self.data)} blocchi.")
+            print(f"Caricati {len(self.data)} blocchi.")
         except json.JSONDecodeError:
             self.data = []
             print("Errore nella decodifica dei dati JSON della blockchain.")
@@ -28,9 +28,9 @@ class BlockchainStats:
         # Ordiniamo i tempi dal più vecchio al più recente
         times.sort()
         
-        differenze = []
-        for i in range(1, len(times)):
-            differenze.append(times[i] - times[i-1])
+        differenze = [
+        times[i] - times[i-1] for i in range(1, len(times))
+        ]
         
         # Usa sum() e len() come descritto nel file docx
         return sum(differenze) / len(differenze)
@@ -110,10 +110,7 @@ class BlockchainStats:
                     indirizzo = output.get('pubkey_hash')
                     valore = float(output.get('value', 0))
                     
-                    if indirizzo in bilanci:
-                        bilanci[indirizzo] += valore
-                    else:
-                        bilanci[indirizzo] = valore
+                    bilanci[indirizzo] = bilanci.get(indirizzo, 0) + valore
         
         # Restituiamo i primi 3 indirizzi più ricchi
         top_ricchi = sorted(bilanci.items(), key=lambda x: x[1], reverse=True)[:3]
