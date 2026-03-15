@@ -7,8 +7,10 @@ class BlockchainStats:
     def __init__(self, json_data: str):
         try:
             full_data = json.loads(json_data)
-            # La chiave nel tuo JSON è "blocks"
+            # La chiave nel tuo JSON è "blocks un dizionario con chiave "blocks" e valore una lista di blocchi, quindi accediamo a quella lista
+            #ogni blocco è un dizionario con chiavi come "height", "timestamp", "nonce", "transactions", ecc.
             self.data = full_data.get('blocks', [])
+            #self.data è ora una lista di blocchi, ognuno dei quali è un dizionario con le informazioni del blocco
             print(f"Caricati {len(self.data)} blocchi.")
         except json.JSONDecodeError:
             self.data = []
@@ -166,5 +168,5 @@ if __name__ == "__main__":
         
         print("Analisi completata con successo! File 'analitiche.json' generato.")
 
-    except Exception as e:
-        print(f"Errore critico durante l'esecuzione: {e}")
+    except json.JSONDecodeError:
+        print("Errore: Impossibile decodificare i dati JSON.")
