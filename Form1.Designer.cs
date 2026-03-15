@@ -42,7 +42,7 @@ partial class Form1
         base.Dispose(disposing);
     }
 
-    #region Windows Form Designer generated code
+    #region Windows Form Designer 
 
     private void InitializeComponent()
     {
@@ -192,6 +192,71 @@ partial class Form1
         btn.Cursor = Cursors.Hand;
         btn.FlatAppearance.BorderSize = 0;
     }
+    private void ConfiguraMenuNavigazione(string porta)
+{
+    pnlDettaglio.Controls.Clear();
+
+    AggiungiBottoneAlMenu(btnUTXOSet);
+    AggiungiBottoneAlMenu(btnAnalitiche);
+    AggiungiBottoneAlMenu(btnVisualizzaTransazione);
+    AggiungiBottoneAlMenu(btnInviaTransazione);
+    AggiungiBottoneAlMenu(btnAggiungiWallet);
+    AggiungiBottoneAlMenu(btnMining);
+    AggiungiBottoneAlMenu(btncreaindirizzo);
+    AggiungiBottoneAlMenu(btnVisualizzaBlockchain);
+    AggiungiBottoneAlMenu(btnHome);
+    AggiungiBottoneAlMenu(btnIndietroWallet);
+    AggiungiBottoneAlMenu(btnIndietroBlockchain);
+   
+
+    
+    StilizzaBottoneNav(btnHome, "🏠 HOME", Color.FromArgb(45, 45, 48));
+    StilizzaBottoneNav(btnIndietroWallet, "INDIETRO", Color.FromArgb(45, 45, 48));
+    StilizzaBottoneNav(btnIndietroBlockchain, "INDIETRO", Color.FromArgb(45, 45, 48));
+    btnIndietroWallet.Visible = false; 
+    btnIndietroBlockchain.Visible = false;
+    btnHome.Click += BtnHome_Click;
+
+}
+
+private void AggiungiBottoneAlMenu(Button btn)
+{
+    btn.Dock = DockStyle.Top;
+    btn.Height = 50;
+    btn.FlatStyle = FlatStyle.Flat;
+    btn.FlatAppearance.BorderSize = 0;
+    btn.ForeColor = Color.White;
+    btn.Font = new Font("Segoe UI", 10, FontStyle.Bold);
+    pnlDettaglio.Controls.Add(btn);
+}
+private void StilizzaBottoneNav(Button btn, string testo, Color colore)
+{
+    btn.Text = testo;
+    btn.BackColor = colore;
+    btn.Cursor = Cursors.Hand;
+}
+private void EntraNelNodo(string porta)
+{
+    _blockchainManager.PortaCorrente = porta;
+
+    pnlLogin.Visible = false;
+    pnlDettaglio.Visible = true;
+    pnlHeaderDettaglio.Visible = true;
+    pnlContainer.Visible = true;
+
+    ConfiguraMenuNavigazione(porta);
+
+    lblTitle.Text = $"ACCOUNT ATTIVO: NODO {porta} - SELEZIONA FUNZIONE";
+    lblTitle.Location = new Point(200, 20);
+
+}
+private void PreparaAreaLavoro(string nomeOperazione)
+{
+    
+    pnlContainer.Controls.Clear();
+    lblTitle.Text = $"{nomeOperazione} - NODO {_blockchainManager.PortaCorrente}";
+    lblTitle.Location = new Point(370, 20);
+}
 
     #endregion
 }

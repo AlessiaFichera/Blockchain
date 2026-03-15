@@ -11,7 +11,7 @@ namespace Blockchain.Core
      public required string tx_id { get; set; }
     
 
-    public int index { get; set; }
+    public required int index { get; set; }
     
     public double value { get; set; }
     public required string pub_key_hash { get; set; }

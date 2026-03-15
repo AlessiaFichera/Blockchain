@@ -38,6 +38,10 @@ namespace Blockchain.Core
         
         // Evento per notificare l'aggiunta di un nuovo blocco alla blockchain
         public event EventHandler<BlockAddedEventArgs>? BlockAdded;
+        protected virtual void OnBlockAdded(Blocks block)
+        {
+            BlockAdded?.Invoke(this, new BlockAddedEventArgs(block));
+        }
         // Costruttore che inizializza la blockchain e la rubrica degli indirizzi
         public BlockchainManager()
         {
@@ -85,11 +89,8 @@ namespace Blockchain.Core
                 }
             }
         }
-        // Metodo protetto per sollevare l'evento di aggiunta di un blocco, passando il blocco appena aggiunto come argomento
-        protected virtual void OnBlockAdded(Blocks block)
-        {
-            BlockAdded?.Invoke(this, new BlockAddedEventArgs(block));
-        }
+
+        
         // Metodo per sincronizzare la rubrica globale degli indirizzi
         public async Task<List<string>> SincronizzaRubricaGlobaleAsync()
         {
