@@ -1,4 +1,4 @@
-package main
+package core
 
 import (
 	"encoding/hex"
@@ -10,7 +10,7 @@ const subsidy = 10
 
 // Rappresenta una transazione in uscita (TXO)
 type TXOutput struct {
-	Value      int    // Valore contenuto
+	Value      uint64 // Valore contenuto
 	PubKeyHash []byte // Hash della chiave da sbloccare
 }
 
@@ -20,7 +20,7 @@ type TXOutputs struct {
 }
 
 // Crea e restituisce un TXO
-func NewTXOutput(value int, address string) *TXOutput {
+func NewTXOutput(value uint64, address string) *TXOutput {
 	txo := &TXOutput{value, nil}
 	pubKeyHash := AddressToPubKeyHash(address)
 	txo.PubKeyHash = pubKeyHash
@@ -33,7 +33,7 @@ func (out TXOutput) String() string {
 	var builder strings.Builder
 
 	builder.WriteString("      Value:      ")
-	builder.WriteString(strconv.Itoa(out.Value))
+	builder.WriteString(strconv.FormatUint(out.Value, 10))
 	builder.WriteByte('\n')
 
 	builder.WriteString("      PubKeyHash: ")

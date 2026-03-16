@@ -5,11 +5,9 @@ import (
 	"log"
 	"net/http"
 	"os"
-)
 
-const (
-	centralNode        = "central-node"
-	centralNodeAddress = "http://central-node:8080"
+	"go_blockchain/network"
+	"go_blockchain/storage"
 )
 
 var (
@@ -44,19 +42,19 @@ func init() {
 }
 
 func main() {
-	storage, err := NewBoltStorage(dbFile)
+	storage, err := storage.NewBoltStorage(dbFile)
 	if err != nil {
 		fmt.Printf("[%s] Errore creazione DB: %s\n", nodeName, err)
 	}
 	defer storage.Close()
 	fmt.Printf("[%s] DB inizializzato con successo\n", nodeName)
 
-	server, err := StartServer(storage)
+	server, err := network.StartServer(storage, walletFile, nodeName, nodeAddress)
 	if err != nil {
 		fmt.Printf("[%s] Errore creazione server: %s \n", nodeName, err)
 	}
 
-	router := SetupRouter(server)
+	router := network.SetupRouter(server)
 
 	fmt.Printf("[%s] Nodo avviato sulla porta %s...\n", nodeName, listenPort)
 

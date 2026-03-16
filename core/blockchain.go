@@ -1,4 +1,4 @@
-package main
+package core
 
 import (
 	"bytes"
@@ -10,8 +10,8 @@ const genesisBlockData = "The Times 03/Jan/2009 Chancellor on brink of second ba
 
 // Blockchain: sequenza di blocchi
 type Blockchain struct {
-	tip     []byte
-	storage Storage
+	Tip     []byte
+	Storage Storage
 }
 
 // Restituisce la blockchain
@@ -21,7 +21,7 @@ func NewBlockchain(s Storage) (*Blockchain, error) {
 		return nil, err
 	}
 
-	return &Blockchain{tip: lastHash, storage: s}, nil
+	return &Blockchain{Tip: lastHash, Storage: s}, nil
 }
 
 // Restituisce la blockchain, se non trova blocchi crea il Genesis block
@@ -31,7 +31,7 @@ func NewBlockchainWithGB(address string, s Storage) (*Blockchain, error) {
 		return nil, err
 	}
 
-	bc := &Blockchain{storage: s}
+	bc := &Blockchain{Storage: s}
 
 	if len(lastHash) == 0 {
 		fmt.Printf("Nessuna blockchain trovata. Generazione Genesis Block con l'address: %s\n", address)
@@ -47,7 +47,7 @@ func NewBlockchainWithGB(address string, s Storage) (*Blockchain, error) {
 
 	} else {
 		fmt.Printf("Blockchain caricata.\n")
-		bc.tip = lastHash
+		bc.Tip = lastHash
 	}
 
 	return bc, nil
@@ -55,7 +55,7 @@ func NewBlockchainWithGB(address string, s Storage) (*Blockchain, error) {
 
 // Mina un nuovo blocco e lo restituisce
 func (bc *Blockchain) MineNewBlock(address string, dataCoinbase string, transactions []*Transaction) (*Block, error) {
-	height, err := bc.storage.GetHeight()
+	height, err := bc.Storage.GetHeight()
 	if err != nil {
 		return nil, err
 	}
@@ -75,18 +75,18 @@ func (bc *Blockchain) MineNewBlock(address string, dataCoinbase string, transact
 	txs = append(txs, cbtx)
 	txs = append(txs, transactions...)
 
-	newBlock := NewBlock(txs, bc.tip, height+1)
+	newBlock := NewBlock(txs, bc.Tip, height+1)
 
 	return newBlock, nil
 }
 
 // Aggiunge un blocco alla catena
 func (bc *Blockchain) AddBlockToChain(block *Block) error {
-	if err := bc.storage.SaveBlock(block); err != nil {
+	if err := bc.Storage.SaveBlock(block); err != nil {
 		return err
 	}
 
-	bc.tip = block.Hash
+	bc.Tip = block.Hash
 
 	return nil
 }
@@ -156,13 +156,13 @@ func (bc *Blockchain) VerifyTransaction(tx *Transaction) (bool, error) {
 		return false, err
 	}
 
-	var inputSum int
+	var inputSum uint64
 	for _, vin := range tx.Vin {
 		prevTx := prevTXs[hex.EncodeToString(vin.Txid)]
 		targetOutput := prevTx.Vout[vin.Vout]
 
 		// Verifica la presenza degli UTXO
-		exists, err := bc.storage.CheckUTXO(vin.Txid, vin.Vout)
+		exists, err := bc.Storage.CheckUTXO(vin.Txid, vin.Vout)
 		if err != nil {
 			return false, fmt.Errorf("errore database durante controllo UTXO: %w", err)
 		}
@@ -179,7 +179,7 @@ func (bc *Blockchain) VerifyTransaction(tx *Transaction) (bool, error) {
 		inputSum += targetOutput.Value
 	}
 
-	var outputSum int
+	var outputSum uint64
 	for _, vout := range tx.Vout {
 		outputSum += vout.Value
 	}

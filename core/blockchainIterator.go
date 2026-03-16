@@ -1,4 +1,4 @@
-package main
+package core
 
 type BlockchainIterator struct {
 	currentHash []byte
@@ -7,7 +7,7 @@ type BlockchainIterator struct {
 
 // Crea un nuovo iteratore partendo dal tip della blockchain
 func (bc *Blockchain) Iterator() *BlockchainIterator {
-	return &BlockchainIterator{bc.tip, bc.storage}
+	return &BlockchainIterator{bc.Tip, bc.Storage}
 }
 
 // Restituisce il blocco precedente nella catena

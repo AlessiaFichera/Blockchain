@@ -1,4 +1,4 @@
-package main
+package core
 
 import (
 	"bytes"
@@ -10,12 +10,15 @@ import (
 // Gestisce l'insieme di account
 type Wallet struct {
 	Accounts map[string]*Account
+	filePath string
 }
 
 // Crea un wallet e lo restituisce
-func NewWallet() (*Wallet, error) {
-	wallet := Wallet{}
-	wallet.Accounts = make(map[string]*Account)
+func NewWallet(path string) (*Wallet, error) {
+	wallet := Wallet{
+		Accounts: make(map[string]*Account),
+		filePath: path,
+	}
 	err := wallet.loadFromFile()
 	return &wallet, err
 }
@@ -46,11 +49,11 @@ func (wallet *Wallet) GetAddresses() []string {
 
 // Carica le coppie di chiavi presenti nel file sul wallet
 func (wallet *Wallet) loadFromFile() error {
-	if _, err := os.Stat(walletFile); os.IsNotExist(err) {
+	if _, err := os.Stat(wallet.filePath); os.IsNotExist(err) {
 		return nil
 	}
 
-	fileContent, err := os.ReadFile(walletFile)
+	fileContent, err := os.ReadFile(wallet.filePath)
 	if err != nil {
 		return err
 	}
@@ -77,7 +80,7 @@ func (wallet Wallet) saveToFile() error {
 		return err
 	}
 
-	err = os.WriteFile(walletFile, content.Bytes(), 0600)
+	err = os.WriteFile(wallet.filePath, content.Bytes(), 0600)
 	if err != nil {
 		return err
 	}

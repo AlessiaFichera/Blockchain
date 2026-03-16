@@ -1,10 +1,12 @@
-package main
+package storage
 
 import (
 	"bytes"
 	"encoding/binary"
 	"encoding/gob"
 	"fmt"
+
+	"go_blockchain/core"
 
 	"go.etcd.io/bbolt"
 )
@@ -56,7 +58,7 @@ func NewBoltStorage(dbPath string) (*BoltStorage, error) {
 }
 
 // Salva l'ultimo blocco nel DB
-func (s *BoltStorage) SaveBlock(block *Block) error {
+func (s *BoltStorage) SaveBlock(block *core.Block) error {
 	transactions := block.Transactions
 	hash := block.Hash
 	height := make([]byte, 4)
@@ -89,7 +91,7 @@ func (s *BoltStorage) SaveBlock(block *Block) error {
 }
 
 // Restituisce un blocco dato l'hash. Se non esiste restituisce nil.
-func (s *BoltStorage) GetBlock(hash []byte) (*Block, error) {
+func (s *BoltStorage) GetBlock(hash []byte) (*core.Block, error) {
 	var val []byte
 	// View entra in sola lettura
 	err := s.db.View(func(tx *bbolt.Tx) error {
@@ -101,11 +103,11 @@ func (s *BoltStorage) GetBlock(hash []byte) (*Block, error) {
 		return nil, err
 	}
 
-	return deserialize[*Block](val)
+	return deserialize[*core.Block](val)
 }
 
 // Salva un blocco candidato
-func (s *BoltStorage) SaveCandidateBlock(block *Block) error {
+func (s *BoltStorage) SaveCandidateBlock(block *core.Block) error {
 	blockBytes, err := serialize(block)
 	if err != nil {
 		return err
@@ -118,7 +120,7 @@ func (s *BoltStorage) SaveCandidateBlock(block *Block) error {
 }
 
 // Restituisce un blocco candidato dato l'hash
-func (s *BoltStorage) GetCandidateBlock(hash []byte) (*Block, error) {
+func (s *BoltStorage) GetCandidateBlock(hash []byte) (*core.Block, error) {
 	var val []byte
 	err := s.db.View(func(tx *bbolt.Tx) error {
 		b := tx.Bucket(candidatesBucket)
@@ -130,7 +132,7 @@ func (s *BoltStorage) GetCandidateBlock(hash []byte) (*Block, error) {
 		return nil, err
 	}
 
-	return deserialize[*Block](val)
+	return deserialize[*core.Block](val)
 }
 
 // Rimuove un blocco candidato
@@ -187,19 +189,19 @@ func (s *BoltStorage) CheckUTXO(txID []byte, index int) (bool, error) {
 }
 
 // Restituisce il totale dei fondi disponibili per un dato PubKeyHash
-func (s *BoltStorage) GetBalanceUTXO(pubKeyHash []byte) (int, error) {
+func (s *BoltStorage) GetBalanceUTXO(pubKeyHash []byte) (uint64, error) {
 	balance, _, err := s.findUTXOs(pubKeyHash, 0)
 	return balance, err
 
 }
 
 // Restituisce il minimo di UTXO per coprire la cifra richiesta.
-func (s *BoltStorage) GetUTXOForAmount(pubKeyHash []byte, amount int) (int, []UTXO, error) {
+func (s *BoltStorage) GetUTXOForAmount(pubKeyHash []byte, amount uint64) (uint64, []core.UTXO, error) {
 	return s.findUTXOs(pubKeyHash, amount)
 }
 
 // Restituisce tutti gli UTXO presenti nel database.
-func (s *BoltStorage) GetUTXOSet() ([]UTXO, error) {
+func (s *BoltStorage) GetUTXOSet() ([]core.UTXO, error) {
 	_, utxos, err := s.findUTXOs(nil, 0)
 	return utxos, err
 }
@@ -211,23 +213,23 @@ Se pubKeyHash non è nil e limit non è 0 restituisce gli UTXO di pubKeyHash per
 Se pubKeyHash non è nil e limit è 0 restituisce tutti gli UTXO di pubKeyHash
 Se pubKeyHash è nil restituisce tutti gli UTXO di tutti gli indirizzi
 */
-func (s *BoltStorage) findUTXOs(pubKeyHash []byte, limit int) (int, []UTXO, error) {
-	var utxos []UTXO
-	accumulated := 0
+func (s *BoltStorage) findUTXOs(pubKeyHash []byte, limit uint64) (uint64, []core.UTXO, error) {
+	var utxos []core.UTXO
+	var accumulated uint64 = 0
 
 	err := s.db.View(func(tx *bbolt.Tx) error {
 		b := tx.Bucket(utxoBucket)
 		c := b.Cursor()
 
 		for k, v := c.First(); k != nil; k, v = c.Next() {
-			out, _ := deserialize[TXOutput](v)
+			out, _ := deserialize[core.TXOutput](v)
 
 			if pubKeyHash == nil || bytes.Equal(out.PubKeyHash, pubKeyHash) {
 				txID := make([]byte, 32)
 				copy(txID, k[:32])
 				index := int(binary.BigEndian.Uint32(k[32:]))
 
-				utxos = append(utxos, UTXO{TxID: txID, Index: index, TXOutput: out})
+				utxos = append(utxos, core.UTXO{TxID: txID, Index: index, TXOutput: out})
 				accumulated += out.Value
 
 				if limit > 0 && accumulated >= limit {
@@ -241,7 +243,7 @@ func (s *BoltStorage) findUTXOs(pubKeyHash []byte, limit int) (int, []UTXO, erro
 }
 
 // Aggiorna utxobucket dopo l'aggiunta di un nuovo blocco nella blockchain
-func (s *BoltStorage) updateUTXOBucket(boltTx *bbolt.Tx, transactions []*Transaction) error {
+func (s *BoltStorage) updateUTXOBucket(boltTx *bbolt.Tx, transactions []*core.Transaction) error {
 	b := boltTx.Bucket([]byte(utxoBucket))
 
 	for _, tx := range transactions {

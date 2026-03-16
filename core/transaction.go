@@ -1,4 +1,4 @@
-package main
+package core
 
 import (
 	"bytes"
@@ -85,14 +85,14 @@ func (tx Transaction) IsCoinbase() bool {
 }
 
 // Crea una nuova transazione
-func NewTransaction(bc *Blockchain, account *Account, to string, amount int) (*Transaction, error) {
+func NewTransaction(bc *Blockchain, account *Account, to string, amount uint64) (*Transaction, error) {
 	var inputs []TXInput
 	var outputs []TXOutput
 
 	address := account.GetAddress()
 	pubKeyHash := AddressToPubKeyHash(address)
 
-	acc, utxos, err := bc.storage.GetUTXOForAmount(pubKeyHash, amount)
+	acc, utxos, err := bc.Storage.GetUTXOForAmount(pubKeyHash, amount)
 	if err != nil {
 		return nil, err
 	}

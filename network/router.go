@@ -1,4 +1,4 @@
-package main
+package network
 
 import (
 	"encoding/json"
@@ -15,7 +15,7 @@ type Job struct {
 type TransactionRequest struct {
 	From   string `json:"from"`
 	To     string `json:"to"`
-	Amount int    `json:"amount"`
+	Amount uint64 `json:"amount"`
 }
 
 // Risposte all'utente:
@@ -87,14 +87,14 @@ type TXInputInfo struct {
 }
 
 type TXOutputInfo struct {
-	Value      int    `json:"value"`
+	Value      uint64 `json:"value"`
 	PubKeyHash string `json:"pubkey_hash"`
 }
 
 type UTXOInfo struct {
 	TxID       string `json:"tx_id"`
 	Index      int    `json:"index"`
-	Value      int    `json:"value"`
+	Value      uint64 `json:"value"`
 	PubKeyHash string `json:"pub_key_hash"`
 }
 
@@ -241,6 +241,12 @@ func activateMineHandler(s *Server) http.HandlerFunc {
 		}
 
 		rawResponse := <-resChan
+
+		if err, ok := rawResponse.(error); ok {
+			sendError(w, "Errore recupero indirizzo: "+err.Error(), http.StatusInternalServerError)
+			return
+		}
+
 		response, ok := rawResponse.(MineResponse)
 		if !ok {
 			sendError(w, "Risposta del server non valida", http.StatusInternalServerError)

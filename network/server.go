@@ -1,4 +1,4 @@
-package main
+package network
 
 import (
 	"bytes"
@@ -8,20 +8,27 @@ import (
 	"net/http"
 	"strconv"
 	"time"
+
+	"go_blockchain/core"
 )
 
 const (
+	centralNode        = "central-node"
+	centralNodeAddress = "http://central-node:8080"
+
 	currentVersion       = 1
 	thresholdFullMempool = 1
 )
 
 // Rappresenta il server che risponde alle richieste
 type Server struct {
-	Blockchain   *Blockchain
+	Blockchain   *core.Blockchain
+	Wallet       *core.Wallet
 	JobChan      chan Job
-	Address      string
+	NodeName     string
+	NodeAddress  string
 	Peers        map[string]bool
-	Mempool      map[string]*Transaction
+	Mempool      map[string]*core.Transaction
 	MinerAddress string
 }
 
@@ -38,13 +45,13 @@ type GetBlocksMessage struct {
 }
 
 type BlocksMessage struct {
-	Blocks   []*Block `json:"blocks"`
-	AddrFrom string   `json:"addr_from"`
+	Blocks   []*core.Block `json:"blocks"`
+	AddrFrom string        `json:"addr_from"`
 }
 
 type TxMessage struct {
 	AddrFrom    string
-	Transaction Transaction
+	Transaction core.Transaction
 }
 
 type InvMessage struct {
@@ -60,36 +67,38 @@ type GetDataMessage struct {
 }
 
 // Avvia il server per gestire le richieste che accedono al DB sequenzialmente
-func StartServer(storage Storage) (*Server, error) {
+func StartServer(storage core.Storage, walletFile string, nodeName string, nodeAddress string) (*Server, error) {
 
-	server := &Server{
-		JobChan: make(chan Job, 100),
-		Address: nodeAddress,
-		Peers:   make(map[string]bool),
-		Mempool: make(map[string]*Transaction),
+	wallet, err := core.NewWallet(walletFile)
+	if err != nil {
+		return nil, err
 	}
 
-	if nodeName == centralNode {
+	server := &Server{
+		Wallet:      wallet,
+		JobChan:     make(chan Job, 100),
+		NodeName:    nodeName,
+		NodeAddress: nodeAddress,
+		Peers:       make(map[string]bool),
+		Mempool:     make(map[string]*core.Transaction),
+	}
 
-		wallet, err := NewWallet()
-		if err != nil {
-			return nil, err
-		}
+	if server.NodeName == centralNode {
 
-		listAddresses := wallet.GetAddresses()
+		listAddresses := server.Wallet.GetAddresses()
 
 		var address string
 		if len(listAddresses) > 0 {
 			address = listAddresses[0]
 		} else {
-			address, err = wallet.AddAccount()
+			address, err = server.Wallet.AddAccount()
 			if err != nil {
 				return nil, err
 			}
-			fmt.Printf("[%s] Nuovo account creato: %s\n", nodeName, address)
+			fmt.Printf("[%s] Nuovo account creato: %s\n", server.NodeName, address)
 		}
 
-		bc, err := NewBlockchainWithGB(address, storage)
+		bc, err := core.NewBlockchainWithGB(address, storage)
 		if err != nil {
 			return nil, err
 		}
@@ -98,7 +107,7 @@ func StartServer(storage Storage) (*Server, error) {
 
 	} else {
 
-		bc, err := NewBlockchain(storage)
+		bc, err := core.NewBlockchain(storage)
 		if err != nil {
 			return nil, err
 		}
@@ -115,7 +124,7 @@ func StartServer(storage Storage) (*Server, error) {
 }
 
 func (s *Server) runServer() {
-	fmt.Printf("[%s]Server del nodo avviato. In ascolto sul canale...\n", nodeName)
+	fmt.Printf("[%s]Server del nodo avviato. In ascolto sul canale...\n", s.NodeName)
 	for job := range s.JobChan {
 		switch job.Type {
 		case "CREATE_ADDRESS":
@@ -194,7 +203,7 @@ func (s *Server) runServer() {
 // Funzioni Send
 
 func (s Server) sendVersion(to string) error {
-	height, err := s.Blockchain.storage.GetHeight()
+	height, err := s.Blockchain.Storage.GetHeight()
 	if err != nil {
 		return err
 	}
@@ -203,61 +212,61 @@ func (s Server) sendVersion(to string) error {
 		Version:   currentVersion,
 		Height:    height,
 		Timestamp: time.Now().Unix(),
-		AddrFrom:  nodeAddress,
+		AddrFrom:  s.NodeAddress,
 	}
 
-	fmt.Printf("[%s] Invio messaggio VERSION a %s \n", nodeName, to)
+	fmt.Printf("[%s] Invio messaggio VERSION a %s \n", s.NodeName, to)
 	payload, _ := json.Marshal(msg)
-	sendMessage(to+"/p2p/version", payload)
+	s.sendMessage(to+"/p2p/version", payload)
 	return nil
 }
 
 func (s *Server) sendGetBlocks(to string, startHeight int) {
 	msg := GetBlocksMessage{
 		StartHeight: startHeight,
-		AddrFrom:    s.Address,
+		AddrFrom:    s.NodeAddress,
 	}
 
 	payload, _ := json.Marshal(msg)
 
-	fmt.Printf("[%s] Invio messaggio GetBlocks a %s \n", nodeName, to)
-	sendMessage(to+"/p2p/get-blocks", payload)
+	fmt.Printf("[%s] Invio messaggio GetBlocks a %s \n", s.NodeName, to)
+	s.sendMessage(to+"/p2p/get-blocks", payload)
 }
 
-func (s *Server) sendBlocks(to string, blocks []*Block) {
+func (s *Server) sendBlocks(to string, blocks []*core.Block) {
 	payload := BlocksMessage{
 		Blocks:   blocks,
-		AddrFrom: s.Address,
+		AddrFrom: s.NodeAddress,
 	}
 
 	data, _ := json.Marshal(payload)
 
-	fmt.Printf("[%s] Invio messaggio Blocks a %s \n", nodeName, to)
-	sendMessage(to+"/p2p/blocks", data)
+	fmt.Printf("[%s] Invio messaggio Blocks a %s \n", s.NodeName, to)
+	s.sendMessage(to+"/p2p/blocks", data)
 }
 
-func (s *Server) sendTx(to string, tx *Transaction) {
+func (s *Server) sendTx(to string, tx *core.Transaction) {
 	msg := TxMessage{
-		AddrFrom:    s.Address,
+		AddrFrom:    s.NodeAddress,
 		Transaction: *tx,
 	}
 	payload, _ := json.Marshal(msg)
 
-	fmt.Printf("[%s] Invio messaggio TX a %s \n", nodeName, to)
-	go sendMessage(to+"/p2p/receive-tx", payload)
+	fmt.Printf("[%s] Invio messaggio TX a %s \n", s.NodeName, to)
+	go s.sendMessage(to+"/p2p/receive-tx", payload)
 }
 
 func (s *Server) sendInv(toAddress string, kind string, itemID []byte) {
 	inventory := InvMessage{
-		AddrFrom: s.Address,
+		AddrFrom: s.NodeAddress,
 		Type:     kind,
 		ID:       itemID,
 	}
 
 	payload, _ := json.Marshal(inventory)
 
-	fmt.Printf("[%s] Invio INV (%s) a %s\n", nodeName, kind, toAddress)
-	go sendMessage(toAddress+"/p2p/inv", payload)
+	fmt.Printf("[%s] Invio INV (%s) a %s\n", s.NodeName, kind, toAddress)
+	go s.sendMessage(toAddress+"/p2p/inv", payload)
 }
 
 func (s *Server) sendBroadcastInv(kind string, itemID []byte, returnAddr string) {
@@ -271,17 +280,17 @@ func (s *Server) sendBroadcastInv(kind string, itemID []byte, returnAddr string)
 
 func (s *Server) sendGetData(to string, kind string, id []byte) {
 	msg := GetDataMessage{
-		AddrFrom: s.Address,
+		AddrFrom: s.NodeAddress,
 		Type:     kind,
 		ID:       id,
 	}
 	payload, _ := json.Marshal(msg)
 
-	fmt.Printf("[%s] Invio messaggio GetData a %s \n", nodeName, to)
-	go sendMessage(to+"/p2p/get-data", payload)
+	fmt.Printf("[%s] Invio messaggio GetData a %s \n", s.NodeName, to)
+	go s.sendMessage(to+"/p2p/get-data", payload)
 }
 
-func sendMessage(url string, payload []byte) {
+func (s *Server) sendMessage(url string, payload []byte) {
 	go func() {
 		client := &http.Client{Timeout: 10 * time.Second}
 
@@ -293,9 +302,9 @@ func sendMessage(url string, payload []byte) {
 		defer resp.Body.Close()
 
 		if resp.StatusCode == http.StatusOK {
-			fmt.Printf("[%s] Messaggio inviato con successo a %s (Status: 200 OK)\n", nodeName, url)
+			fmt.Printf("[%s] Messaggio inviato con successo a %s (Status: 200 OK)\n", s.NodeName, url)
 		} else {
-			fmt.Printf("[%s] Attenzione: %s ha risposto con Status %d\n", nodeName, url, resp.StatusCode)
+			fmt.Printf("[%s] Attenzione: %s ha risposto con Status %d\n", s.NodeName, url, resp.StatusCode)
 		}
 	}()
 }
@@ -305,34 +314,23 @@ func sendMessage(url string, payload []byte) {
 // API Handle
 
 func (s *Server) handleCreateAddress(resChan chan any) {
-	fmt.Printf("[%s] API Create Address\n", nodeName)
+	fmt.Printf("[%s] API Create Address\n", s.NodeName)
 
-	wallet, err := NewWallet()
-	if err != nil {
-		resChan <- fmt.Errorf("errore inizializzazione wallet: %w", err)
-		return
-	}
-
-	address, err := wallet.AddAccount()
+	address, err := s.Wallet.AddAccount()
 	if err != nil {
 		resChan <- fmt.Errorf("errore generazione account: %w", err)
 		return
 	}
 
-	fmt.Printf("[%s] Address creato: %s\n", nodeName, address)
+	fmt.Printf("[%s] Address creato: %s\n", s.NodeName, address)
 
 	resChan <- address
 }
 
 func (s *Server) handleGetAddresses(resChan chan any) {
-	fmt.Printf("[%s] API Get Addresses\n", nodeName)
-	wallet, err := NewWallet()
-	if err != nil {
-		resChan <- fmt.Errorf("errore inizializzazione wallet: %w", err)
-		return
-	}
+	fmt.Printf("[%s] API Get Addresses\n", s.NodeName)
 
-	addresses := wallet.GetAddresses()
+	addresses := s.Wallet.GetAddresses()
 	if addresses == nil {
 		addresses = []string{}
 	}
@@ -341,13 +339,20 @@ func (s *Server) handleGetAddresses(resChan chan any) {
 }
 
 func (s *Server) handleActivateMine(address string, resChan chan any) {
-	fmt.Printf("[%s] API Activate Mine\n", nodeName)
+	fmt.Printf("[%s] API Activate Mine\n", s.NodeName)
 
 	// Controllo se era già miner
 	if s.MinerAddress != "" {
 		resChan <- MineResponse{
 			Message: "Operazione annullata: il nodo è già in modalità Miner.",
 		}
+		return
+	}
+
+	_, exists := s.Wallet.Accounts[address]
+	if !exists {
+		fmt.Printf("[%s] Account %s non trovato nel wallet locale\n", s.NodeName, address)
+		resChan <- fmt.Errorf("indirizzo non trovato localmente")
 		return
 	}
 
@@ -363,26 +368,26 @@ func (s *Server) handleActivateMine(address string, resChan chan any) {
 }
 
 func (s *Server) handleGetBalance(address string, resChan chan any) {
-	fmt.Printf("[%s] API Get Balance per %s\n", nodeName, address)
+	fmt.Printf("[%s] API Get Balance per %s\n", s.NodeName, address)
 
-	pubKeyHash := AddressToPubKeyHash(address)
-	balance, err := s.Blockchain.storage.GetBalanceUTXO(pubKeyHash)
+	pubKeyHash := core.AddressToPubKeyHash(address)
+	balance, err := s.Blockchain.Storage.GetBalanceUTXO(pubKeyHash)
 	if err != nil {
 		resChan <- fmt.Errorf("Errore nel recupero degli UTXO : %w", err)
 		return
 	}
 
-	fmt.Printf("[%s] Bilancio per %s: %d coins", nodeName, address, balance)
+	fmt.Printf("[%s] Bilancio per %s: %d coins", s.NodeName, address, balance)
 
 	resChan <- BalanceResponse{
 		Address: address,
-		Result:  strconv.Itoa(balance),
+		Result:  strconv.FormatUint(uint64(balance), 10),
 	}
 
 }
 
 func (s *Server) handleGetPeers(resChan chan any) {
-	fmt.Printf("[%s] API Get Peers\n", nodeName)
+	fmt.Printf("[%s] API Get Peers\n", s.NodeName)
 	var peerList []string
 
 	for address := range s.Peers {
@@ -393,7 +398,7 @@ func (s *Server) handleGetPeers(resChan chan any) {
 		peerList = []string{}
 	}
 
-	fmt.Printf("[%s] Peer connessi: %d\n", nodeName, len(peerList))
+	fmt.Printf("[%s] Peer connessi: %d\n", s.NodeName, len(peerList))
 
 	resChan <- PeersResponse{
 		Count: len(peerList),
@@ -402,7 +407,7 @@ func (s *Server) handleGetPeers(resChan chan any) {
 }
 
 func (s *Server) handleGetMempool(resChan chan any) {
-	fmt.Printf("[%s] API Get Mempool\n", nodeName)
+	fmt.Printf("[%s] API Get Mempool\n", s.NodeName)
 	var txList []string
 
 	for txID := range s.Mempool {
@@ -413,7 +418,7 @@ func (s *Server) handleGetMempool(resChan chan any) {
 		txList = []string{}
 	}
 
-	fmt.Printf("[%s] Transazioni in attesa: %d\n", nodeName, len(txList))
+	fmt.Printf("[%s] Transazioni in attesa: %d\n", s.NodeName, len(txList))
 
 	resChan <- MempoolResponse{
 		Count: len(txList),
@@ -422,30 +427,23 @@ func (s *Server) handleGetMempool(resChan chan any) {
 }
 
 func (s *Server) handleSendLocalTx(req TransactionRequest, resChan chan any) {
-	fmt.Printf("[%s] Richiesta invio TX da %s verso %s per un ammontare di %d\n", nodeName, req.From, req.To, req.Amount)
+	fmt.Printf("[%s] Richiesta invio TX da %s verso %s per un ammontare di %d\n", s.NodeName, req.From, req.To, req.Amount)
 
-	wallet, err := NewWallet()
-	if err != nil {
-		fmt.Printf("[%s] Errore caricamento wallet: %v\n", nodeName, err)
-		resChan <- fmt.Errorf("errore caricamento wallet")
-		return
-	}
-
-	account, exists := wallet.Accounts[req.From]
+	account, exists := s.Wallet.Accounts[req.From]
 	if !exists {
-		fmt.Printf("[%s] Account %s non trovato nel wallet locale\n", nodeName, req.From)
+		fmt.Printf("[%s] Account %s non trovato nel wallet locale\n", s.NodeName, req.From)
 		resChan <- fmt.Errorf("indirizzo non trovato localmente")
 		return
 	}
 
-	tx, err := NewTransaction(s.Blockchain, account, req.To, req.Amount)
+	tx, err := core.NewTransaction(s.Blockchain, account, req.To, req.Amount)
 	if err != nil {
-		fmt.Printf("[%s] Fallimento creazione Tx: %v\n", nodeName, err)
+		fmt.Printf("[%s] Fallimento creazione Tx: %v\n", s.NodeName, err)
 		resChan <- err
 		return
 	}
 
-	fmt.Printf("[%s] Transazione creata correttamente (ID: %x). \n", nodeName, tx.ID)
+	fmt.Printf("[%s] Transazione creata correttamente (ID: %x). \n", s.NodeName, tx.ID)
 	s.addToMempool(tx)
 
 	// Risponde all'utente che la creazione della tx è andata a buon fine
@@ -458,18 +456,18 @@ func (s *Server) handleSendLocalTx(req TransactionRequest, resChan chan any) {
 	if s.isMiner() && s.checkMempoolFull() {
 		s.mineBlock()
 	} else {
-		if nodeName != centralNode {
+		if s.NodeName != centralNode {
 			s.sendTx(centralNodeAddress, tx)
 		} else {
 			// Central Node deve propagare la tx ricevuta a tutti gli altri
-			fmt.Printf("[%s] Central Node propaga la transazione agli altri peer...\n", nodeName)
+			fmt.Printf("[%s] Central Node propaga la transazione agli altri peer...\n", s.NodeName)
 			s.sendBroadcastInv("tx", tx.ID, "")
 		}
 	}
 }
 
 func (s *Server) handlePrintChain(resChan chan any) {
-	fmt.Printf("[%s] API Print Blockchain\n", nodeName)
+	fmt.Printf("[%s] API Print Blockchain\n", s.NodeName)
 	blocks, err := s.getBlockchainJSON()
 
 	if err != nil {
@@ -477,7 +475,7 @@ func (s *Server) handlePrintChain(resChan chan any) {
 		return
 	}
 
-	fmt.Printf("[%s] Blockchain estratta con successo (%d blocchi)\n", nodeName, len(blocks))
+	fmt.Printf("[%s] Blockchain estratta con successo (%d blocchi)\n", s.NodeName, len(blocks))
 
 	resChan <- BlockchainResponse{
 		Blocks: blocks,
@@ -485,8 +483,8 @@ func (s *Server) handlePrintChain(resChan chan any) {
 }
 
 func (s *Server) handleGetUTXOSet(resChan chan any) {
-	fmt.Printf("[%s] API Print UTXO Set\n", nodeName)
-	utxos, err := s.Blockchain.storage.GetUTXOSet()
+	fmt.Printf("[%s] API Print UTXO Set\n", s.NodeName)
+	utxos, err := s.Blockchain.Storage.GetUTXOSet()
 
 	if err != nil {
 		resChan <- fmt.Errorf(" Impossibile recuperare i dati dell'UTXO set %v\n", err)
@@ -518,46 +516,46 @@ func (s *Server) handleGetUTXOSet(resChan chan any) {
 
 func (s *Server) handleVersion(msg VersionMessage) {
 
-	localHeight, err := s.Blockchain.storage.GetHeight()
+	localHeight, err := s.Blockchain.Storage.GetHeight()
 	if err != nil {
-		fmt.Printf("[%s] Errore recupero altezza locale: %v\n", nodeName, err)
+		fmt.Printf("[%s] Errore recupero altezza locale: %v\n", s.NodeName, err)
 		return
 	}
 
-	fmt.Printf("[%s] Messaggio VERSION da %s: Peer Height %d | Local Height %d\n", nodeName, msg.AddrFrom, msg.Height, localHeight)
+	fmt.Printf("[%s] Messaggio VERSION da %s: Peer Height %d | Local Height %d\n", s.NodeName, msg.AddrFrom, msg.Height, localHeight)
 
 	if msg.Height > localHeight {
-		fmt.Printf("[%s] Il mio nodo è arretrato. Avvio sincronizzazione da blocco %d...\n", nodeName, localHeight+1)
+		fmt.Printf("[%s] Il mio nodo è arretrato. Avvio sincronizzazione da blocco %d...\n", s.NodeName, localHeight+1)
 		s.sendGetBlocks(msg.AddrFrom, localHeight+1)
 
 	} else if msg.Height < localHeight {
-		fmt.Printf("[%s] Il peer %s è arretrato. Gli notifico la mia versione.\n", nodeName, msg.AddrFrom)
+		fmt.Printf("[%s] Il peer %s è arretrato. Gli notifico la mia versione.\n", s.NodeName, msg.AddrFrom)
 		if err := s.sendVersion(msg.AddrFrom); err != nil {
-			fmt.Printf("[%s] Errore nel invio di send :%s", nodeName, err)
+			fmt.Printf("[%s] Errore nel invio di send :%s", s.NodeName, err)
 		}
 
 	} else {
-		fmt.Printf("[%s] Nodo in pari con %s.\n", nodeName, msg.AddrFrom)
+		fmt.Printf("[%s] Nodo in pari con %s.\n", s.NodeName, msg.AddrFrom)
 	}
 
-	if nodeName == centralNode {
+	if s.NodeName == centralNode {
 		if !s.Peers[msg.AddrFrom] {
 			s.Peers[msg.AddrFrom] = true
-			fmt.Printf("[%s] Nuovo nodo registrato: %s. Totale peer conosciuti: %d\n", nodeName, msg.AddrFrom, len(s.Peers))
+			fmt.Printf("[%s] Nuovo nodo registrato: %s. Totale peer conosciuti: %d\n", s.NodeName, msg.AddrFrom, len(s.Peers))
 		}
 	}
 }
 
 func (s *Server) handleGetBlocks(msg GetBlocksMessage) {
-	fmt.Printf("[%s] Messaggio GET-BLOCKS da %s: richiesta blocchi da altezza: %d\n", nodeName, msg.AddrFrom, msg.StartHeight)
+	fmt.Printf("[%s] Messaggio GET-BLOCKS da %s: richiesta blocchi da altezza: %d\n", s.NodeName, msg.AddrFrom, msg.StartHeight)
 
-	var blocksToSend []*Block
+	var blocksToSend []*core.Block
 	iter := s.Blockchain.Iterator()
 
 	for {
 		block, err := iter.Next()
 		if err != nil {
-			fmt.Printf("[%s] Errore recupero blocchi: %v\n", nodeName, err)
+			fmt.Printf("[%s] Errore recupero blocchi: %v\n", s.NodeName, err)
 			break
 		}
 
@@ -584,34 +582,34 @@ func (s *Server) handleGetBlocks(msg GetBlocksMessage) {
 
 func (s *Server) handleBlocks(msg BlocksMessage) {
 	if len(msg.Blocks) == 0 {
-		fmt.Printf("[%s] Messaggio BLOCKS da %s. Ricevuti 0 blocchi\n", nodeName, msg.AddrFrom)
+		fmt.Printf("[%s] Messaggio BLOCKS da %s. Ricevuti 0 blocchi\n", s.NodeName, msg.AddrFrom)
 		return
 	}
 
-	localHeight, err := s.Blockchain.storage.GetHeight()
+	localHeight, err := s.Blockchain.Storage.GetHeight()
 	if err != nil {
-		fmt.Printf("[%s] Errore DB in handleBlocks: %v\n", nodeName, err)
+		fmt.Printf("[%s] Errore DB in handleBlocks: %v\n", s.NodeName, err)
 		return
 	}
 
-	fmt.Printf("[%s] Messaggio BLOCKS da %s. Ricevuti %d blocchi\n", nodeName, msg.AddrFrom, len(msg.Blocks))
+	fmt.Printf("[%s] Messaggio BLOCKS da %s. Ricevuti %d blocchi\n", s.NodeName, msg.AddrFrom, len(msg.Blocks))
 
 	for _, block := range msg.Blocks {
 
 		// Verifica altezza
 		if block.Height != localHeight+1 {
-			fmt.Printf("[%s] Blocco %d scartato: altezza non coerente (attesa: %d)\n", nodeName, block.Height, localHeight+1)
+			fmt.Printf("[%s] Blocco %d scartato: altezza non coerente (attesa: %d)\n", s.NodeName, block.Height, localHeight+1)
 			break
 		}
 		// Verifica validità blocco
-		pow := NewProofOfWork(block)
+		pow := core.NewProofOfWork(block)
 		if !pow.Validate() {
 			break
 		}
 
 		// Verifica concatenazione hash
-		if !bytes.Equal(block.PrevBlockHash, s.Blockchain.tip) {
-			fmt.Printf("[%s] Blocco %d scartato: Hash precedente non coincide\n", nodeName, block.Height)
+		if !bytes.Equal(block.PrevBlockHash, s.Blockchain.Tip) {
+			fmt.Printf("[%s] Blocco %d scartato: Hash precedente non coincide\n", s.NodeName, block.Height)
 			break
 		}
 
@@ -625,46 +623,46 @@ func (s *Server) handleBlocks(msg BlocksMessage) {
 			}
 		}
 		if !allTxValid {
-			fmt.Printf("[%s] Blocco %d scartato: contiene transazioni non valide\n", nodeName, block.Height)
+			fmt.Printf("[%s] Blocco %d scartato: contiene transazioni non valide\n", s.NodeName, block.Height)
 			break
 		}
 		// Aggiunta Blocco
 		err := s.Blockchain.AddBlockToChain(block)
 		if err != nil {
-			fmt.Printf("[%s] Errore salvataggio blocco %d: %v\n", nodeName, block.Height, err)
+			fmt.Printf("[%s] Errore salvataggio blocco %d: %v\n", s.NodeName, block.Height, err)
 			break
 		}
 
 		// Il blocco aggiunto va tolto dai candidati del miner che lo ha proposto
 		if s.isMiner() {
-			s.Blockchain.storage.DeleteCandidateBlock(block.Hash)
+			s.Blockchain.Storage.DeleteCandidateBlock(block.Hash)
 		}
 
-		fmt.Printf("[%s] Blocco %d aggiunto correttamente!\n", nodeName, block.Height)
+		fmt.Printf("[%s] Blocco %d aggiunto correttamente!\n", s.NodeName, block.Height)
 		s.cleanMempool(block.Transactions)
 		localHeight++
 
-		if nodeName == centralNode && !s.isMiner() {
-			fmt.Printf("[%s] Central Node propaga il blocco agli altri peer...\n", nodeName)
+		if s.NodeName == centralNode && !s.isMiner() {
+			fmt.Printf("[%s] Central Node propaga il blocco agli altri peer...\n", s.NodeName)
 			s.sendBroadcastInv("block", block.Hash, "")
 		}
 	}
 
-	newHeight, _ := s.Blockchain.storage.GetHeight()
-	fmt.Printf("[%s] Sincronizzazione completata. Nuova altezza: %d\n", nodeName, newHeight)
+	newHeight, _ := s.Blockchain.Storage.GetHeight()
+	fmt.Printf("[%s] Sincronizzazione completata. Nuova altezza: %d\n", s.NodeName, newHeight)
 
 }
 
 func (s *Server) handleReceiveTx(msg TxMessage) {
 	txID := hex.EncodeToString(msg.Transaction.ID)
-	fmt.Printf("[%s] Messaggio TX ricevuto da %s , transazione ricevuta: %s\n", nodeName, msg.AddrFrom, txID)
+	fmt.Printf("[%s] Messaggio TX ricevuto da %s , transazione ricevuta: %s\n", s.NodeName, msg.AddrFrom, txID)
 	if _, exists := s.getResource("tx", msg.Transaction.ID, false); exists {
 		return
 	}
 
 	valid, err := s.Blockchain.VerifyTransaction(&msg.Transaction)
 	if err != nil || !valid {
-		fmt.Printf("[%s] Transazione %s scartata: non valida o errore verifica: %v\n", nodeName, txID, err)
+		fmt.Printf("[%s] Transazione %s scartata: non valida o errore verifica: %v\n", s.NodeName, txID, err)
 		return
 	}
 
@@ -675,39 +673,39 @@ func (s *Server) handleReceiveTx(msg TxMessage) {
 	}
 
 	// Central Node deve propagare la tx ricevuta a tutti gli altri
-	if nodeName == centralNode && !s.isMiner() {
-		fmt.Printf("[%s] Central Node propaga la transazione agli altri peer...\n", nodeName)
+	if s.NodeName == centralNode && !s.isMiner() {
+		fmt.Printf("[%s] Central Node propaga la transazione agli altri peer...\n", s.NodeName)
 		s.sendBroadcastInv("tx", msg.Transaction.ID, msg.AddrFrom)
 	}
 
 }
 
 func (s *Server) handleInv(inv InvMessage) {
-	fmt.Printf("[%s] Messaggio INV di tipo %s ricevuto da %s\n", nodeName, inv.Type, inv.AddrFrom)
+	fmt.Printf("[%s] Messaggio INV di tipo %s ricevuto da %s\n", s.NodeName, inv.Type, inv.AddrFrom)
 
 	// Se si riceve Inv non si guarda tra i candidati, poichè significa che il candidato sarà confermato
 	if _, exists := s.getResource(inv.Type, inv.ID, false); exists {
 		return
 	}
 
-	fmt.Printf("[%s] %s %x mancante. Invio GetData a %s\n", nodeName, inv.Type, inv.ID, inv.AddrFrom)
+	fmt.Printf("[%s] %s %x mancante. Invio GetData a %s\n", s.NodeName, inv.Type, inv.ID, inv.AddrFrom)
 	s.sendGetData(inv.AddrFrom, inv.Type, inv.ID)
 }
 
 func (s *Server) handleGetData(req GetDataMessage) {
-	fmt.Printf("[%s] Messaggio GetData (%s) ricevuto da %s per l'ID: %x\n", nodeName, req.Type, req.AddrFrom, req.ID)
+	fmt.Printf("[%s] Messaggio GetData (%s) ricevuto da %s per l'ID: %x\n", s.NodeName, req.Type, req.AddrFrom, req.ID)
 
 	resource, exists := s.getResource(req.Type, req.ID, true)
 	if !exists {
-		fmt.Printf("[%s] Risorsa %s : %x non trovata\n", nodeName, req.Type, req.ID)
+		fmt.Printf("[%s] Risorsa %s : %x non trovata\n", s.NodeName, req.Type, req.ID)
 		return
 	}
 
 	switch v := resource.(type) {
-	case *Transaction:
+	case *core.Transaction:
 		s.sendTx(req.AddrFrom, v)
-	case *Block:
-		s.sendBlocks(req.AddrFrom, []*Block{v})
+	case *core.Block:
+		s.sendBlocks(req.AddrFrom, []*core.Block{v})
 	}
 }
 
@@ -728,32 +726,16 @@ func (s *Server) getResource(kind string, id []byte, candidate bool) (any, bool)
 		}
 	}
 
-	if kind == "block" { /*
-			// Cerca in Blockchain
-			if block, err := s.Blockchain.storage.GetBlock(id); err != nil {
-				fmt.Printf("Errore controllo blocco: %v\n", err)
-				return nil, false
-
-			} else if block != nil {
-				return block, true
-			}
-
-			// Se è un miner cerca nei blocchi candidati
-			if s.isMiner() && candidate{
-				if block, err := s.Blockchain.storage.GetCandidateBlock(id); err == nil {
-					return block, true
-				}
-			}
-		*/
+	if kind == "block" {
 		idHex := hex.EncodeToString(id)
-		block, err := s.Blockchain.storage.GetBlock(id)
+		block, err := s.Blockchain.Storage.GetBlock(id)
 		if err == nil && block != nil {
 			fmt.Printf("[DEBUG] Blocco %s già presente nel DB principale\n", idHex)
 			return block, true
 		}
 
 		if s.isMiner() && candidate {
-			cand, err := s.Blockchain.storage.GetCandidateBlock(id)
+			cand, err := s.Blockchain.Storage.GetCandidateBlock(id)
 			if err == nil && cand != nil {
 				fmt.Printf("[DEBUG] Blocco %s già presente nei CANDIDATI\n", idHex)
 				return cand, true
@@ -764,63 +746,66 @@ func (s *Server) getResource(kind string, id []byte, candidate bool) (any, bool)
 }
 
 // Rimuove dalla Mempool le transazioni che sono state incluse in un blocco confermato
-func (s *Server) cleanMempool(txs []*Transaction) {
+func (s *Server) cleanMempool(txs []*core.Transaction) {
 	for _, tx := range txs {
 		txID := hex.EncodeToString(tx.ID)
 
 		if _, exists := s.Mempool[txID]; exists {
 			delete(s.Mempool, txID)
-			fmt.Printf("[%s] Transazione %s rimossa dalla Mempool (confermata in blocco)\n", nodeName, txID)
+			fmt.Printf("[%s] Transazione %s rimossa dalla Mempool (confermata in blocco)\n", s.NodeName, txID)
 		}
 	}
 
-	fmt.Printf("[%s] Pulizia completata. Transazioni rimanenti in Mempool: %d\n", nodeName, len(s.Mempool))
+	fmt.Printf("[%s] Pulizia completata. Transazioni rimanenti in Mempool: %d\n", s.NodeName, len(s.Mempool))
 }
 
+// Avvia il mining
 func (s *Server) mineBlock() {
-	var txs []*Transaction
+	var txs []*core.Transaction
 	for _, tx := range s.Mempool {
 		txs = append(txs, tx)
 	}
 
-	fmt.Printf("[%s] Mining di un nuovo blocco con %d transazioni...\n", nodeName, len(txs))
+	fmt.Printf("[%s] Mining di un nuovo blocco con %d transazioni...\n", s.NodeName, len(txs))
 
 	newBlock, err := s.Blockchain.MineNewBlock(s.MinerAddress, "", txs)
 	if err != nil {
-		fmt.Printf("[%s] Errore critico nel mining: %v\n", nodeName, err)
+		fmt.Printf("[%s] Errore critico nel mining: %v\n", s.NodeName, err)
 		return
 	}
 
 	s.cleanMempool(txs[:])
 
-	if nodeName == centralNode {
+	if s.NodeName == centralNode {
 		err = s.Blockchain.AddBlockToChain(newBlock)
 		if err != nil {
-			fmt.Printf("[%s] Errore critico nel aggiunta alla catena del blocco minato: %v\n", nodeName, err)
+			fmt.Printf("[%s] Errore critico nel aggiunta alla catena del blocco minato: %v\n", s.NodeName, err)
 			return
 		}
 		s.sendBroadcastInv("block", newBlock.Hash, "")
 	} else {
-		s.Blockchain.storage.SaveCandidateBlock(newBlock)
+		s.Blockchain.Storage.SaveCandidateBlock(newBlock)
 		s.sendInv(centralNodeAddress, "block", newBlock.Hash)
 	}
 }
 
-func (s *Server) addToMempool(tx *Transaction) {
+// Aggiunge la funzione passata alla mempool
+func (s *Server) addToMempool(tx *core.Transaction) {
 	txID := hex.EncodeToString(tx.ID)
 	s.Mempool[txID] = tx
 
-	fmt.Printf("[%s] Transazione %s aggiunta alla mempool locale (Totale: %d)\n", nodeName, txID, len(s.Mempool))
+	fmt.Printf("[%s] Transazione %s aggiunta alla mempool locale (Totale: %d)\n", s.NodeName, txID, len(s.Mempool))
 }
 
+// Verifica se la mempool è piena
 func (s *Server) checkMempoolFull() bool {
-	fmt.Printf("[%s] CheckMempool (%d TX).\n", nodeName, len(s.Mempool))
+	fmt.Printf("[%s] CheckMempool (%d TX).\n", s.NodeName, len(s.Mempool))
 	if !s.isMiner() {
 		return false
 	}
 
 	if len(s.Mempool) >= thresholdFullMempool {
-		fmt.Printf("[%s] Mempool piena (%d TX).\n", nodeName, len(s.Mempool))
+		fmt.Printf("[%s] Mempool piena (%d TX).\n", s.NodeName, len(s.Mempool))
 		return true
 	}
 	return false
@@ -884,6 +869,7 @@ func (s *Server) getBlockchainJSON() ([]BlockInfo, error) {
 	return chain, nil
 }
 
+// Verifica se il nodo è un miner
 func (s *Server) isMiner() bool {
 	return s.MinerAddress != ""
 }

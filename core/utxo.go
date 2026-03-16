@@ -1,4 +1,4 @@
-package main
+package core
 
 import (
 	"encoding/hex"
@@ -20,12 +20,15 @@ func (u UTXO) String() string {
 	builder.WriteString("TXID: ")
 	builder.WriteString(hex.EncodeToString(u.TxID))
 	builder.WriteString("\n")
+
 	builder.WriteString("Index: ")
 	builder.WriteString(strconv.Itoa(u.Index))
 	builder.WriteString("\n")
+
 	builder.WriteString("Value: ")
-	builder.WriteString(strconv.Itoa(u.TXOutput.Value))
+	builder.WriteString(strconv.FormatUint(u.TXOutput.Value, 10))
 	builder.WriteString("\n")
+
 	builder.WriteString("PubKeyHash: ")
 	builder.WriteString(hex.EncodeToString(u.TXOutput.PubKeyHash))
 
