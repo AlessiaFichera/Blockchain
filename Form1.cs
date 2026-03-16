@@ -492,18 +492,27 @@ private async void LinkTransazione_Click(object? sender, EventArgs e)
     }
 }  
 
+// Metodo che visualizza statistiche e grafici della blockchain
 private void VisualizzaStatistiche(string jsonContenuto)
 {
-   pnlContainer.Controls.Clear();
+    
+    pnlContainer.Controls.Clear();
+
+    // Estraiamo le statistiche dal JSON
     var stats = _blockchainManager.EstraiAnalitiche(jsonContenuto);
-    if (stats == null || stats.Count == 0) return;
+
+    if (stats == null || stats.Count == 0)
+        return;
 
     int coordinataX = 20;
     pnlContainer.AutoScroll = true;
 
+    // Lista per tutte le statistiche normali
     List<Analitica> altreStats = new List<Analitica>();
+
     Analitica? statRicchi = null;
 
+    // Separiamo le statistiche normali da quella dei wallet ricchi
     foreach (var s in stats)
     {
         if (s.Titolo.Contains("Ricchi") || s.Titolo.Contains("Indirizzi"))
@@ -516,44 +525,50 @@ private void VisualizzaStatistiche(string jsonContenuto)
         }
     }
 
-   foreach (var s in altreStats)
-{
-    Panel card = new Panel
+    // Creazione delle CARD statistiche
+    foreach (var s in altreStats)
     {
-        Size = new Size(170, 100),
-        Location = new Point(coordinataX, 50),
-        BackColor = Color.White,
-        BorderStyle = BorderStyle.FixedSingle
-    };
+        Panel card = new Panel
+        {
+            Size = new Size(170, 100),
+            Location = new Point(coordinataX, 50),
+            BackColor = Color.White,
+            BorderStyle = BorderStyle.FixedSingle
+        };
 
-    // Label per il TITOLO (Sempre Blu)
-    Label lblTitolo = new Label
-    {
-        Text = s.Titolo.ToUpper(),
-        Dock = DockStyle.Top,
-        Height = 40,
-        TextAlign = ContentAlignment.BottomCenter,
-        Font = new Font("Segoe UI", 9, FontStyle.Bold),
-        ForeColor = Color.Blue 
-    };
 
-    Label lblValore = new Label
-    {
-        Text = s.Valore,
-        Dock = DockStyle.Fill,
-        TextAlign = ContentAlignment.TopCenter,
-        Font = new Font("Segoe UI", 11, FontStyle.Bold),
-        ForeColor = Color.Black 
-    };
+        Label lblTitolo = new Label
+        {
+            Text = s.Titolo.ToUpper(),
+            Dock = DockStyle.Top,
+            Height = 40,
+            TextAlign = ContentAlignment.BottomCenter,
+            Font = new Font("Segoe UI", 9, FontStyle.Bold),
+            ForeColor = Color.Blue
+        };
 
-    card.Controls.Add(lblValore);
-    card.Controls.Add(lblTitolo);
     
-    pnlContainer.Controls.Add(card);
-    coordinataX += 190;
-}
+        Label lblValore = new Label
+        {
+            Text = s.Valore,
+            Dock = DockStyle.Fill,
+            TextAlign = ContentAlignment.TopCenter,
+            Font = new Font("Segoe UI", 11, FontStyle.Bold),
+            ForeColor = Color.Black
+        };
+
+        card.Controls.Add(lblValore);
+        card.Controls.Add(lblTitolo);
+
+        pnlContainer.Controls.Add(card);
+
+        
+        coordinataX += 190;
+    }
 
     int yOffset = 180;
+
+    
     if (statRicchi != null)
     {
         Panel leaderboard = new Panel
@@ -564,6 +579,7 @@ private void VisualizzaStatistiche(string jsonContenuto)
             BorderStyle = BorderStyle.FixedSingle
         };
 
+        
         Label lblTitolo = new Label
         {
             Text = "🏆 TOP 3 INDIRIZZI PIÙ RICCHI",
@@ -574,6 +590,7 @@ private void VisualizzaStatistiche(string jsonContenuto)
             ForeColor = Color.Blue
         };
 
+    
         Label lblDati = new Label
         {
             Text = statRicchi.Valore,
@@ -585,17 +602,23 @@ private void VisualizzaStatistiche(string jsonContenuto)
 
         leaderboard.Controls.Add(lblDati);
         leaderboard.Controls.Add(lblTitolo);
+
         pnlContainer.Controls.Add(leaderboard);
-        
-        yOffset += 160; 
+
+        yOffset += 160;
     }
 
+    
     Size sizeGrafico1 = new Size(700, 400);
-     Size sizeGrafico = new Size(700, 350);
+    Size sizeGrafico = new Size(700, 350);
+
+    
     AggiungiGrafico("grafico_blockchain.png", yOffset, sizeGrafico1);
     AggiungiGrafico("grafico_nonce.png", yOffset + 450, sizeGrafico);
 }
 
+
+// Metodo che aggiunge un grafico al pannello
 private void AggiungiGrafico(string path, int y, Size size)
 {
     if (File.Exists(path))
@@ -607,16 +630,22 @@ private void AggiungiGrafico(string path, int y, Size size)
             Size = size,
             SizeMode = PictureBoxSizeMode.Zoom
         };
+
         pnlContainer.Controls.Add(pic);
     }
 }
 
-    private void CaricaWalletGrafici(List<string> walletList, int count)
+
+// Metodo che carica la lista dei wallet
+private void CaricaWalletGrafici(List<string> walletList, int count)
 {
     pnlContainer.Controls.Clear();
     pnlContainer.AutoScroll = true;
-    btnIndietroWallet.Visible = false; 
+
+    btnIndietroWallet.Visible = false;
+
     pnlContainer.BackColor = Color.FromArgb(30, 33, 40);
+
     
     Label lblTitolo = new Label
     {
@@ -626,20 +655,23 @@ private void AggiungiGrafico(string path, int y, Size size)
         Location = new Point(20, 15),
         AutoSize = true
     };
+
     pnlContainer.Controls.Add(lblTitolo);
 
-    int coordinataY = 60; 
+    int coordinataY = 60;
 
+    // Creiamo una card per ogni wallet
     foreach (var wallet in walletList)
     {
         Panel walletCard = new Panel
         {
             Size = new Size(pnlContainer.Width - 60, 80),
-            BackColor = Color.FromArgb(45, 50, 60), 
+            BackColor = Color.FromArgb(45, 50, 60),
             Location = new Point(20, coordinataY),
             Padding = new Padding(10)
         };
 
+        
         Label lblTag = new Label
         {
             Text = "WALLET",
@@ -649,16 +681,18 @@ private void AggiungiGrafico(string path, int y, Size size)
             AutoSize = true
         };
 
+        // Indirizzo wallet
         Label lblAddress = new Label
         {
             Text = wallet ?? "N/D",
             ForeColor = Color.White,
-            Font = new Font("Consolas", 10), 
+            Font = new Font("Consolas", 10),
             Location = new Point(15, 35),
-            Size = new Size(walletCard.Width - 200, 30), 
+            Size = new Size(walletCard.Width - 200, 30),
             TextAlign = ContentAlignment.MiddleLeft
         };
-        // All'interno del foreach (var wallet in walletList)
+
+        // Bottone per visualizzare saldo
         Button btnSaldo = new Button
         {
             Text = "SALDO",
@@ -668,24 +702,33 @@ private void AggiungiGrafico(string path, int y, Size size)
             ForeColor = Color.White,
             FlatStyle = FlatStyle.Flat,
             Cursor = Cursors.Hand,
-            Tag = wallet 
+
+            // Salviamo l'indirizzo nel Tag per usarlo nel click
+            Tag = wallet
         };
 
-// Colleghiamo l'evento click
+        // Evento click del bottone
         btnSaldo.Click += BtnSaldo_Click;
+
         walletCard.Controls.Add(btnSaldo);
         walletCard.Controls.Add(lblTag);
         walletCard.Controls.Add(lblAddress);
+
         pnlContainer.Controls.Add(walletCard);
 
-        coordinataY += 95; 
+        coordinataY += 95;
     }
 }
+
+
+// Evento click bottone SALDO
 private async void BtnSaldo_Click(object? sender, EventArgs e)
 {
     if (sender is Button btn && btn.Tag is string indirizzo)
     {
-        BalanceResponse risposta = await _blockchainManager.OttieniSaldoCompletoAsync(indirizzo);
+        // Richiesta saldo blockchain
+        BalanceResponse risposta =
+            await _blockchainManager.OttieniSaldoCompletoAsync(indirizzo);
 
         string wallet = "";
         string saldo = "0";
@@ -693,26 +736,23 @@ private async void BtnSaldo_Click(object? sender, EventArgs e)
         if (risposta != null)
         {
             if (risposta.Address != null)
-            {
                 wallet = risposta.Address;
-            }
 
             if (risposta.Result != null)
-            {
                 saldo = risposta.Result;
-            }
         }
 
+        
         VisualizzaDettaglioSaldo(wallet, saldo);
     }
 }
 private void VisualizzaDettaglioSaldo(string indirizzo, string saldo)
 {
-    // 1. Configurazione del contenitore principale
+    
     pnlContainer.Controls.Clear();
-    pnlContainer.BackColor = Color.FromArgb(20, 22, 29); // Blu notte profondo (sfondo immagine)
+    pnlContainer.BackColor = Color.FromArgb(20, 22, 29); 
 
-    // 2. Titolo della sezione
+
     Label lblInfo = new Label
     {
         Text = "SALDO ATTUALE",
@@ -722,20 +762,20 @@ private void VisualizzaDettaglioSaldo(string indirizzo, string saldo)
         AutoSize = true
     };
 
-    // 3. Card principale (stile "glassmorphism" scuro)
+    
     Panel resCard = new Panel
     {
         Size = new Size(pnlContainer.Width - 50, 160),
         Location = new Point(25, 75),
-        BackColor = Color.FromArgb(32, 36, 47), // Grigio-blu della card
+        BackColor = Color.FromArgb(32, 36, 47), 
         Padding = new Padding(20)
     };
 
-    // 4. Etichetta "Indirizzo"
+    
     Label lblIndirizzoTitolo = new Label {
         Text = "INDIRIZZO WALLET",
         Font = new Font("Segoe UI", 8, FontStyle.Bold),
-        ForeColor = Color.FromArgb(0, 122, 204), // Azzurro brillante per i tag
+        ForeColor = Color.FromArgb(0, 122, 204), 
         Location = new Point(20, 20),
         AutoSize = true
     };
@@ -759,7 +799,7 @@ private void VisualizzaDettaglioSaldo(string indirizzo, string saldo)
 
     Label lblSaldoValore = new Label {
         Text = $"{saldo} BTC",
-        ForeColor = Color.FromArgb(255, 165, 0), // Arancione/Oro come nell'immagine
+        ForeColor = Color.FromArgb(255, 165, 0), 
         Font = new Font("Segoe UI", 16, FontStyle.Bold),
         Location = new Point(20, 120),
         AutoSize = true
@@ -824,7 +864,7 @@ private void DisegnaInterfacciaInvio()
     };
     btnSoloInvia.Click += BtnSoloInvia_Click;
 
-    // Aggiunta etichette (Testo Bianco su Sfondo Scuro)
+
     pnlContainer.Controls.Add(new Label { 
         Text = "DA (Mio Wallet):", 
         Location = new Point(30, 70), 
@@ -896,7 +936,7 @@ private async Task DisegnaSezioneMining()
     };
 
     
-    // Recuperiamo i tuoi wallet come oggetto WalletRoot
+    // Recuperiamo i  wallet come oggetto WalletRoot
     WalletRoot mieiWallet = await _blockchainManager.EstraiListaWallet();
     if (mieiWallet != null && mieiWallet.Addresses != null)
     {
@@ -941,33 +981,37 @@ private async void BtnSoloMining_Click(object? sender, EventArgs e)
         MessageBox.Show("Errore durante il mining. Verifica che il nodo Go sia attivo.");
     }
 
-    // Ripristina il tasto
+
     if (sender is Button btnRipristina) 
     {
         btnRipristina.Enabled = true;
         btnRipristina.Text = "ESEGUI MINING";
     }
 }
-    
-       private void TransazioniGrafiche(List<TransactionData> transazioni)
+// Metodo che visualizza graficamente le transazioni
+private void TransazioniGrafiche(List<TransactionData> transazioni)
 {
     pnlContainer.Controls.Clear();
     pnlContainer.AutoScroll = true;
+
     int coordinataY = 20;
 
+    // Ciclo su tutte le transazioni
     foreach (var tx in transazioni)
     {
-        // Aumentiamo l'altezza (Height) a 250 perché ora sono uno sotto l'altro
-        Panel card = new Panel {
-            Size = new Size(pnlContainer.Width - 60, 250), 
+        
+        Panel card = new Panel
+        {
+            Size = new Size(pnlContainer.Width - 60, 250),
             BackColor = Color.White,
             BorderStyle = BorderStyle.FixedSingle,
             Location = new Point(20, coordinataY)
         };
 
-        // Header: ID PER INTERO
-        Label lblId = new Label {
-            Text = "ID-TRANSAZIONE: " + tx.id, // Rimosso Substring per stamparlo tutto
+    
+        Label lblId = new Label
+        {
+            Text = "ID-TRANSAZIONE: " + tx.id,
             Dock = DockStyle.Top,
             Height = 40,
             BackColor = Color.FromArgb(242, 242, 242),
@@ -976,77 +1020,98 @@ private async void BtnSoloMining_Click(object? sender, EventArgs e)
             Padding = new Padding(10, 0, 10, 0)
         };
 
+        
         string testoIn = " INPUT (Provenienza):\n";
+
         if (tx.vin != null && tx.vin.Count > 0)
         {
             testoIn += $"• TxID: {tx.vin[0].txid ?? "N/D"}\n";
             testoIn += $"• Vout Index: #{tx.vin[0].vout_index}\n";
-           testoIn += $"• Sorgente: {tx.vin[0].pubkey?.Substring(0, 40) ?? "N/D"}\n";
+            testoIn += $"• Sorgente: {tx.vin[0].pubkey?.Substring(0, 40) ?? "N/D"}\n";
             testoIn += $"• Signature: {(string.IsNullOrEmpty(tx.vin[0].signature) ? "N/D" : "Presente")}";
         }
 
-        Label lblInput = new Label {
+        Label lblInput = new Label
+        {
             Text = testoIn,
             Location = new Point(15, 50),
-            Size = new Size(card.Width - 30, 80), 
+            Size = new Size(card.Width - 30, 80),
             ForeColor = Color.Firebrick,
             Font = new Font("Segoe UI", 9, FontStyle.Bold)
         };
 
+        
         string testoOut = " OUTPUT (Destinazione):\n";
+
         if (tx.vout != null && tx.vout.Count > 0)
         {
             testoOut += $"• Destinatario: {tx.vout[0].pubkey_hash}\n";
             testoOut += $"• Importo: {tx.vout[0].value} BTC";
         }
 
-        Label lblOutput = new Label {
+        Label lblOutput = new Label
+        {
             Text = testoOut,
-            Location = new Point(15, 160), // Posizionato sotto l'input
-            Size = new Size(card.Width - 30, 80), // Larghezza piena
+            Location = new Point(15, 160),
+            Size = new Size(card.Width - 30, 80),
             ForeColor = Color.ForestGreen,
             Font = new Font("Segoe UI", 9, FontStyle.Bold)
         };
 
+        
         card.Controls.Add(lblOutput);
         card.Controls.Add(lblInput);
         card.Controls.Add(lblId);
+
+        
         pnlContainer.Controls.Add(card);
 
-        coordinataY += 265; // Aumentato lo spazio tra le card
+        
+        coordinataY += 265;
     }
 }
 
+
+// Metodo che visualizza l'UTXO Set
 private void VisualizzaUTXOSet(int count, List<Utxo> utxoset)
 {
     pnlContainer.Controls.Clear();
     pnlContainer.AutoScroll = true;
-    pnlContainer.BackColor = Color.FromArgb(30, 30, 30); 
 
+    
+    pnlContainer.BackColor = Color.FromArgb(30, 30, 30);
+
+    
     Label lblTitolo = new Label
     {
         Text = $"DISPONIBILITÀ UTXO: {count}",
         Font = new Font("Segoe UI", 16, FontStyle.Bold),
-        ForeColor = Color.FromArgb(41, 171, 226), // Blu neon
+        ForeColor = Color.FromArgb(41, 171, 226),
         Location = new Point(20, 15),
         AutoSize = true
     };
+
     pnlContainer.Controls.Add(lblTitolo);
 
     int coordinataY = 65;
 
+    // Ciclo su tutti gli UTXO
     foreach (var utxo in utxoset)
     {
-        //
+        
         Panel utxoCard = new Panel
         {
             Size = new Size(580, 140),
             BackColor = Color.White,
-            Location = new Point(20, coordinataY),
+            Location = new Point(20, coordinataY)
         };
 
-    
-        string IdBreve = (utxo.tx_id?.Length > 15) ? utxo.tx_id.Substring(0, 30) + "..." : utxo.tx_id ?? "N/D";
+        
+        string IdBreve = (utxo.tx_id?.Length > 15)
+            ? utxo.tx_id.Substring(0, 30) + "..."
+            : utxo.tx_id ?? "N/D";
+
+        
         Label lblHeader = new Label
         {
             Text = $" TX-ID: {IdBreve}",
@@ -1060,15 +1125,14 @@ private void VisualizzaUTXOSet(int count, List<Utxo> utxoset)
 
         Label lblValore = new Label
         {
-            Text = $"{utxo.value} BTC", 
+            Text = $"{utxo.value} BTC",
             Font = new Font("Segoe UI", 18, FontStyle.Bold),
             ForeColor = Color.ForestGreen,
             Location = new Point(15, 40),
-            Size = new Size(200, 50),
-        
+            Size = new Size(200, 50)
         };
 
-    
+        
         Label lblInfo = new Label
         {
             Text = $"Index: #{utxo.index}\nProprietario: {utxo.pub_key_hash}",
@@ -1082,14 +1146,19 @@ private void VisualizzaUTXOSet(int count, List<Utxo> utxoset)
         utxoCard.Controls.Add(lblInfo);
         utxoCard.Controls.Add(lblValore);
         utxoCard.Controls.Add(lblHeader);
+
+        
         pnlContainer.Controls.Add(utxoCard);
 
-        coordinataY += 155; 
+        coordinataY += 155;
     }
 }
-        private void VisualizzaNuovoIndirizzo(string indirizzo)
+
+
+// Metodo che mostra il nuovo indirizzo generato
+private void VisualizzaNuovoIndirizzo(string indirizzo)
 {
-    
+
     pnlContainer.Controls.Clear();
     pnlContainer.AutoScroll = true;
 
@@ -1099,20 +1168,22 @@ private void VisualizzaUTXOSet(int count, List<Utxo> utxoset)
         Size = new Size(400, 100),
         BackColor = Color.White,
         BorderStyle = BorderStyle.FixedSingle,
-        Location = new Point(20, 20) 
+        Location = new Point(20, 20)
     };
 
+    
     Label lblHeader = new Label
     {
         Text = "NUOVO INDIRIZZO GENERATO",
         Font = new Font("Segoe UI", 10, FontStyle.Bold),
         ForeColor = Color.White,
-        BackColor = Color.FromArgb(0, 120, 215), 
+        BackColor = Color.FromArgb(0, 120, 215),
         Dock = DockStyle.Top,
         Height = 30,
         TextAlign = ContentAlignment.MiddleCenter
     };
 
+    
     Label lblAddress = new Label
     {
         Text = indirizzo,
@@ -1125,9 +1196,9 @@ private void VisualizzaUTXOSet(int count, List<Utxo> utxoset)
 
     addressCard.Controls.Add(lblAddress);
     addressCard.Controls.Add(lblHeader);
-    
+
     pnlContainer.Controls.Add(addressCard);
 }
-
+    
     }
 }
