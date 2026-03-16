@@ -850,7 +850,7 @@ private void DisegnaInterfacciaInvio()
 
 private async void BtnSoloInvia_Click(object? sender, EventArgs e)
 {
-    // 1. Validazione iniziale (Software Robusto)
+    
     if (_selezioneFrom?.SelectedItem == null || _selezioneTo?.SelectedItem == null || _selezioneImporto?.SelectedItem == null)
     {
         MessageBox.Show("Seleziona mittente, destinatario e importo!");
@@ -967,7 +967,7 @@ private async void BtnSoloMining_Click(object? sender, EventArgs e)
 
         // Header: ID PER INTERO
         Label lblId = new Label {
-            Text = "🆔ID-TRANSAZIONE: " + tx.id, // Rimosso Substring per stamparlo tutto
+            Text = "ID-TRANSAZIONE: " + tx.id, // Rimosso Substring per stamparlo tutto
             Dock = DockStyle.Top,
             Height = 40,
             BackColor = Color.FromArgb(242, 242, 242),
@@ -976,8 +976,7 @@ private async void BtnSoloMining_Click(object? sender, EventArgs e)
             Padding = new Padding(10, 0, 10, 0)
         };
 
-        // Pannello INPUT (Sopra)
-        string testoIn = "📥 INPUT (Provenienza):\n";
+        string testoIn = " INPUT (Provenienza):\n";
         if (tx.vin != null && tx.vin.Count > 0)
         {
             testoIn += $"• TxID: {tx.vin[0].txid ?? "N/D"}\n";
@@ -994,8 +993,7 @@ private async void BtnSoloMining_Click(object? sender, EventArgs e)
             Font = new Font("Segoe UI", 9, FontStyle.Bold)
         };
 
-        // Pannello OUTPUT (Sotto)
-        string testoOut = "📤 OUTPUT (Destinazione):\n";
+        string testoOut = " OUTPUT (Destinazione):\n";
         if (tx.vout != null && tx.vout.Count > 0)
         {
             testoOut += $"• Destinatario: {tx.vout[0].pubkey_hash}\n";
