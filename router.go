@@ -2,9 +2,7 @@ package main
 
 import (
 	"encoding/json"
-	"fmt"
 	"net/http"
-	"strconv"
 )
 
 // Struttura delle richieste al server
@@ -113,9 +111,9 @@ func SetupRouter(server *Server) *http.ServeMux {
 
 	mux.HandleFunc("/api/health", healthHandler)
 
-	mux.HandleFunc("/api/create-address", createAddressHandler)
+	mux.HandleFunc("/api/create-address", createAddressHandler(server))
 
-	mux.HandleFunc("/api/get-addresses", getAddressesHandler)
+	mux.HandleFunc("/api/get-addresses", getAddressesHandler(server))
 
 	mux.HandleFunc("/api/mine", activateMineHandler(server))
 
@@ -161,46 +159,67 @@ func healthHandler(w http.ResponseWriter, r *http.Request) {
 	prettyPrint(w, response)
 }
 
-func createAddressHandler(w http.ResponseWriter, r *http.Request) {
-	w.Header().Set("Content-Type", "application/json")
+func createAddressHandler(s *Server) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
 
-	wallet, err := NewWallet()
-	if err != nil {
-		sendError(w, "Errore creazione wallet"+err.Error(), http.StatusInternalServerError)
-		return
+		resChan := make(chan any)
+
+		s.JobChan <- Job{
+			Type:    "CREATE_ADDRESS",
+			ResChan: resChan,
+		}
+
+		rawResponse := <-resChan
+
+		if err, ok := rawResponse.(error); ok {
+			sendError(w, "Errore durante la creazione dell'indirizzo: "+err.Error(), http.StatusInternalServerError)
+			return
+		}
+
+		address, ok := rawResponse.(string)
+		if !ok {
+			sendError(w, "Risposta del server non valida", http.StatusInternalServerError)
+			return
+		}
+
+		response := AddressResponse{
+			Address: address,
+		}
+
+		prettyPrint(w, response)
 	}
-
-	address, err := wallet.AddAccount()
-	if err != nil {
-		sendError(w, "Errore creazione account: "+err.Error(), http.StatusInternalServerError)
-		return
-	}
-
-	fmt.Printf("[%s] Nuovo account creato: %s\n", nodeName, address)
-
-	response := AddressResponse{
-		Address: address,
-	}
-	prettyPrint(w, response)
 }
 
-func getAddressesHandler(w http.ResponseWriter, r *http.Request) {
-	w.Header().Set("Content-Type", "application/json")
+func getAddressesHandler(s *Server) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
 
-	wallet, err := NewWallet()
-	if err != nil {
-		sendError(w, "Errore caricamento wallet: "+err.Error(), http.StatusInternalServerError)
-		return
+		resChan := make(chan any)
+
+		s.JobChan <- Job{
+			Type:    "GET_ADDRESSES",
+			ResChan: resChan,
+		}
+
+		rawResponse := <-resChan
+
+		if err, ok := rawResponse.(error); ok {
+			sendError(w, "Errore recupero indirizzi: "+err.Error(), http.StatusInternalServerError)
+			return
+		}
+
+		addresses, ok := rawResponse.([]string)
+		if !ok {
+			sendError(w, "Risposta del server non valida", http.StatusInternalServerError)
+			return
+		}
+
+		prettyPrint(w, AddressesResponse{
+			Addresses: addresses,
+			Count:     len(addresses),
+		})
 	}
-
-	addresses := wallet.GetAddresses()
-
-	response := AddressesResponse{
-		Addresses: addresses,
-		Count:     len(addresses),
-	}
-
-	prettyPrint(w, response)
 }
 
 func activateMineHandler(s *Server) http.HandlerFunc {
@@ -222,7 +241,11 @@ func activateMineHandler(s *Server) http.HandlerFunc {
 		}
 
 		rawResponse := <-resChan
-		response := rawResponse.(MineResponse)
+		response, ok := rawResponse.(MineResponse)
+		if !ok {
+			sendError(w, "Risposta del server non valida", http.StatusInternalServerError)
+			return
+		}
 
 		w.Header().Set("Content-Type", "application/json")
 		prettyPrint(w, response)
@@ -246,11 +269,15 @@ func getBalanceHandler(s *Server) http.HandlerFunc {
 		}
 
 		rawResponse := <-resChan
-		response := rawResponse.(BalanceResponse)
 
-		// Verifichiamo se il risultato è numerico, se non è un numero, lo trattiamo come errore
-		if _, err := strconv.Atoi(response.Result); err != nil {
-			sendError(w, response.Result, http.StatusInternalServerError)
+		if err, ok := rawResponse.(error); ok {
+			sendError(w, "Errore recupero bilancio: "+err.Error(), http.StatusInternalServerError)
+			return
+		}
+
+		response, ok := rawResponse.(BalanceResponse)
+		if !ok {
+			sendError(w, "Risposta del server non valida", http.StatusInternalServerError)
 			return
 		}
 
@@ -270,7 +297,11 @@ func getPeersHandler(s *Server) http.HandlerFunc {
 		}
 
 		rawResponse := <-resChan
-		response := rawResponse.(PeersResponse)
+		response, ok := rawResponse.(PeersResponse)
+		if !ok {
+			sendError(w, "Risposta del server non valida", http.StatusInternalServerError)
+			return
+		}
 
 		w.Header().Set("Content-Type", "application/json")
 		prettyPrint(w, response)
@@ -287,7 +318,11 @@ func getMempoolHandler(s *Server) http.HandlerFunc {
 		}
 
 		rawResponse := <-resChan
-		response := rawResponse.(MempoolResponse)
+		response, ok := rawResponse.(MempoolResponse)
+		if !ok {
+			sendError(w, "Risposta del server non valida", http.StatusInternalServerError)
+			return
+		}
 
 		w.Header().Set("Content-Type", "application/json")
 		prettyPrint(w, response)
@@ -317,7 +352,11 @@ func sendTxHandler(s *Server) http.HandlerFunc {
 			return
 		}
 
-		response := rawResponse.(TransactionResponse)
+		response, ok := rawResponse.(TransactionResponse)
+		if !ok {
+			sendError(w, "Risposta del server non valida", http.StatusInternalServerError)
+			return
+		}
 
 		w.Header().Set("Content-Type", "application/json")
 		prettyPrint(w, response)
@@ -340,7 +379,11 @@ func printBlockchainHandler(s *Server) http.HandlerFunc {
 			return
 		}
 
-		response := rawResponse.(BlockchainResponse)
+		response, ok := rawResponse.(BlockchainResponse)
+		if !ok {
+			sendError(w, "Risposta del server non valida", http.StatusInternalServerError)
+			return
+		}
 
 		w.Header().Set("Content-Type", "application/json")
 		prettyPrint(w, response)

@@ -92,7 +92,7 @@ func NewTransaction(bc *Blockchain, account *Account, to string, amount int) (*T
 	address := account.GetAddress()
 	pubKeyHash := AddressToPubKeyHash(address)
 
-	acc, utxos, err := bc.storage.GetUTXO(pubKeyHash, amount)
+	acc, utxos, err := bc.storage.GetUTXOForAmount(pubKeyHash, amount)
 	if err != nil {
 		return nil, err
 	}

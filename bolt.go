@@ -171,43 +171,6 @@ func (s *BoltStorage) GetHeight() (int, error) {
 	return intHeight, err
 }
 
-/*
-Restituisce gli UTXO di un PubKeyHash
-Se amount > 0, si ferma appena raggiunge la soglia.
-Se amount <= 0, restituisce tutti gli UTXO dell'indirizzo.
-*/
-func (s *BoltStorage) GetUTXO(pubKeyHash []byte, amount int) (int, []UTXO, error) {
-	var unspentOutputs []UTXO
-	accumulated := 0
-
-	err := s.db.View(func(tx *bbolt.Tx) error {
-		b := tx.Bucket(utxoBucket)
-		c := b.Cursor()
-
-		for k, v := c.First(); k != nil; k, v = c.Next() {
-			out, _ := deserialize[TXOutput](v)
-
-			if bytes.Equal(out.PubKeyHash, pubKeyHash) {
-
-				txID := make([]byte, 32)
-				copy(txID, k[:32])
-				index := int(binary.BigEndian.Uint32(k[32:]))
-
-				utxo := UTXO{TxID: txID, Index: index, TXOutput: out}
-				unspentOutputs = append(unspentOutputs, utxo)
-
-				accumulated += out.Value
-
-				if amount > 0 && accumulated >= amount {
-					return nil
-				}
-			}
-		}
-		return nil
-	})
-	return accumulated, unspentOutputs, err
-}
-
 // Verifica se un determinato UTXO è presente nel bucket UTXO
 func (s *BoltStorage) CheckUTXO(txID []byte, index int) (bool, error) {
 	key := constructUTXOKey(txID, index)
@@ -223,9 +186,34 @@ func (s *BoltStorage) CheckUTXO(txID []byte, index int) (bool, error) {
 	return exists, err
 }
 
+// Restituisce il totale dei fondi disponibili per un dato PubKeyHash
+func (s *BoltStorage) GetBalanceUTXO(pubKeyHash []byte) (int, error) {
+	balance, _, err := s.findUTXOs(pubKeyHash, 0)
+	return balance, err
+
+}
+
+// Restituisce il minimo di UTXO per coprire la cifra richiesta.
+func (s *BoltStorage) GetUTXOForAmount(pubKeyHash []byte, amount int) (int, []UTXO, error) {
+	return s.findUTXOs(pubKeyHash, amount)
+}
+
 // Restituisce tutti gli UTXO presenti nel database.
 func (s *BoltStorage) GetUTXOSet() ([]UTXO, error) {
+	_, utxos, err := s.findUTXOs(nil, 0)
+	return utxos, err
+}
+
+/*
+	Restituisce gli UTXO richiesti
+
+Se pubKeyHash non è nil e limit non è 0 restituisce gli UTXO di pubKeyHash per coprire limit
+Se pubKeyHash non è nil e limit è 0 restituisce tutti gli UTXO di pubKeyHash
+Se pubKeyHash è nil restituisce tutti gli UTXO di tutti gli indirizzi
+*/
+func (s *BoltStorage) findUTXOs(pubKeyHash []byte, limit int) (int, []UTXO, error) {
 	var utxos []UTXO
+	accumulated := 0
 
 	err := s.db.View(func(tx *bbolt.Tx) error {
 		b := tx.Bucket(utxoBucket)
@@ -234,21 +222,22 @@ func (s *BoltStorage) GetUTXOSet() ([]UTXO, error) {
 		for k, v := c.First(); k != nil; k, v = c.Next() {
 			out, _ := deserialize[TXOutput](v)
 
-			txID := make([]byte, 32)
-			copy(txID, k[:32])
-			index := int(binary.BigEndian.Uint32(k[32:]))
+			if pubKeyHash == nil || bytes.Equal(out.PubKeyHash, pubKeyHash) {
+				txID := make([]byte, 32)
+				copy(txID, k[:32])
+				index := int(binary.BigEndian.Uint32(k[32:]))
 
-			utxo := UTXO{
-				TxID:     txID,
-				Index:    index,
-				TXOutput: out,
+				utxos = append(utxos, UTXO{TxID: txID, Index: index, TXOutput: out})
+				accumulated += out.Value
+
+				if limit > 0 && accumulated >= limit {
+					return nil
+				}
 			}
-			utxos = append(utxos, utxo)
 		}
 		return nil
 	})
-
-	return utxos, err
+	return accumulated, utxos, err
 }
 
 // Aggiorna utxobucket dopo l'aggiunta di un nuovo blocco nella blockchain

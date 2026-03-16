@@ -8,7 +8,8 @@ type Storage interface {
 	DeleteCandidateBlock(hash []byte) error
 	GetLastHash() ([]byte, error)
 	GetHeight() (int, error)
-	GetUTXO(pubKeyHash []byte, amount int) (int, []UTXO, error)
+	GetBalanceUTXO(pubKeyHash []byte) (int, error)
+	GetUTXOForAmount(pubKeyHash []byte, amount int) (int, []UTXO, error)
 	GetUTXOSet() ([]UTXO, error)
 	CheckUTXO(txID []byte, index int) (bool, error)
 	Close() error

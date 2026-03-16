@@ -118,6 +118,11 @@ func (s *Server) runServer() {
 	fmt.Printf("[%s]Server del nodo avviato. In ascolto sul canale...\n", nodeName)
 	for job := range s.JobChan {
 		switch job.Type {
+		case "CREATE_ADDRESS":
+			s.handleCreateAddress(job.ResChan)
+
+		case "GET_ADDRESSES":
+			s.handleGetAddresses(job.ResChan)
 
 		case "ACTIVATE_MINE":
 			if address, ok := job.Data.(string); ok {
@@ -299,6 +304,42 @@ func sendMessage(url string, payload []byte) {
 
 // API Handle
 
+func (s *Server) handleCreateAddress(resChan chan any) {
+	fmt.Printf("[%s] API Create Address\n", nodeName)
+
+	wallet, err := NewWallet()
+	if err != nil {
+		resChan <- fmt.Errorf("errore inizializzazione wallet: %w", err)
+		return
+	}
+
+	address, err := wallet.AddAccount()
+	if err != nil {
+		resChan <- fmt.Errorf("errore generazione account: %w", err)
+		return
+	}
+
+	fmt.Printf("[%s] Address creato: %s\n", nodeName, address)
+
+	resChan <- address
+}
+
+func (s *Server) handleGetAddresses(resChan chan any) {
+	fmt.Printf("[%s] API Get Addresses\n", nodeName)
+	wallet, err := NewWallet()
+	if err != nil {
+		resChan <- fmt.Errorf("errore inizializzazione wallet: %w", err)
+		return
+	}
+
+	addresses := wallet.GetAddresses()
+	if addresses == nil {
+		addresses = []string{}
+	}
+
+	resChan <- addresses
+}
+
 func (s *Server) handleActivateMine(address string, resChan chan any) {
 	fmt.Printf("[%s] API Activate Mine\n", nodeName)
 
@@ -325,13 +366,9 @@ func (s *Server) handleGetBalance(address string, resChan chan any) {
 	fmt.Printf("[%s] API Get Balance per %s\n", nodeName, address)
 
 	pubKeyHash := AddressToPubKeyHash(address)
-	balance, _, err := s.Blockchain.storage.GetUTXO(pubKeyHash, 0)
+	balance, err := s.Blockchain.storage.GetBalanceUTXO(pubKeyHash)
 	if err != nil {
-		fmt.Printf("errore durante il recupero degli UTXO: %v", err)
-		resChan <- BalanceResponse{
-			Address: address,
-			Result:  "Errore nel recupero del bilancio",
-		}
+		resChan <- fmt.Errorf("Errore nel recupero degli UTXO : %w", err)
 		return
 	}
 
