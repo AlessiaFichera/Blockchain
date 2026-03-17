@@ -1,0 +1,5 @@
+# Esclude i dati dei nodi dall'immagine
+nodes_data/
+*.db
+*.dat
+

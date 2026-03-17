@@ -1,0 +1,16 @@
+package core
+
+type Storage interface {
+	SaveBlock(block *Block) error
+	GetBlock(hash []byte) (*Block, error)
+	SaveCandidateBlock(block *Block) error
+	GetCandidateBlock(hash []byte) (*Block, error)
+	DeleteCandidateBlock(hash []byte) error
+	GetLastHash() ([]byte, error)
+	GetHeight() (int, error)
+	GetBalanceUTXO(pubKeyHash []byte) (uint64, error)
+	GetUTXOForAmount(pubKeyHash []byte, amount uint64) (uint64, []UTXO, error)
+	GetUTXOSet() ([]UTXO, error)
+	CheckUTXO(txID []byte, index int) (bool, error)
+	Close() error
+}
