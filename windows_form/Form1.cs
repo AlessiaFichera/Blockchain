@@ -613,8 +613,8 @@ private void VisualizzaStatistiche(string jsonContenuto)
     Size sizeGrafico = new Size(700, 350);
 
     
-    AggiungiGrafico("grafico_blockchain.png", yOffset, sizeGrafico1);
-    AggiungiGrafico("grafico_nonce.png", yOffset + 450, sizeGrafico);
+    AggiungiGrafico("python_analitiche/grafico_blockchain.png", yOffset, sizeGrafico1);
+    AggiungiGrafico("python_analitiche/grafico_nonce.png", yOffset + 450, sizeGrafico);
 }
 
 
@@ -970,17 +970,16 @@ private async void BtnSoloMining_Click(object? sender, EventArgs e)
 
     string indirizzo = _selezioneFrom.SelectedItem.ToString()!;
 
-    bool successo = await _blockchainManager.EseguiMiningAsync(indirizzo);
-    
-    if (successo) 
+    (bool successo,string messaggio) = await _blockchainManager.EseguiMiningAsync(indirizzo);
+   
+    if (successo)
     {
-        MessageBox.Show($"Mining riuscito per {indirizzo}.");
+        MessageBox.Show("Mining: " + messaggio);
     }
-    else 
+    else
     {
-        MessageBox.Show("Errore durante il mining. Verifica che il nodo Go sia attivo.");
+        MessageBox.Show("Mining fallito: " + messaggio);
     }
-
 
     if (sender is Button btnRipristina) 
     {

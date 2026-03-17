@@ -3,7 +3,7 @@ namespace Blockchain.Core
     public class BlockchainResponse
     {
     
-        public List<Blocks>? Blocks { get; set; }
+        public required List<Blocks> Blocks { get; set; }
     }
 
     public class Blocks

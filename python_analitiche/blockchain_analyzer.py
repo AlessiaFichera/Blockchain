@@ -56,7 +56,7 @@ class BlockchainStats:
         plt.grid(True, alpha=0.3)
         plt.legend()
         plt.tight_layout()
-        plt.savefig("grafico_nonce.png")
+        plt.savefig("python_analitiche/grafico_nonce.png")
         plt.close()
 
     def totale_transazioni_rete(self):
@@ -93,7 +93,7 @@ class BlockchainStats:
             plt.xlabel("Valore (BTC)")
             plt.ylabel("Frequenza")
             plt.tight_layout()
-            plt.savefig("grafico_blockchain.png") 
+            plt.savefig("python_analitiche/grafico_blockchain.png") 
             plt.close()
             
             return valore_medio
@@ -158,12 +158,12 @@ if __name__ == "__main__":
                 "difficolta_media": round(stats.calcola_difficolta_media(), 2),
                 "top_ricchi": stats.calcola_ricchi_della_rete()
             },
-            "file_grafico": "grafico_blockchain.png",
-            "sforzo_nonce": "grafico_nonce.png"
+            "file_grafico": "python_analitiche/grafico_blockchain.png",
+            "sforzo_nonce": "python_analitiche/grafico_nonce.png"
         }
 
         # Salvataggio su file JSON per l'interfaccia C#
-        with open("analitiche.json", "w") as f:
+        with open("python_analitiche/analitiche.json", "w") as f:
             json.dump(risultati, f, indent=4)
         
         print("Analisi completata con successo! File 'analitiche.json' generato.")

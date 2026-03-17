@@ -133,7 +133,7 @@ namespace Blockchain.Core
             return _rubricaIndirizziRete.ToList();
         }
         // Metodo per eseguire il mining di un nuovo blocco, specificando l'indirizzo del miner 
-        public async Task<bool> EseguiMiningAsync(string indirizzo)
+        public async Task<(bool success, string message)> EseguiMiningAsync(string indirizzo)
         {
             using var client = new HttpClient();
 
@@ -144,7 +144,11 @@ namespace Blockchain.Core
 
             var response = await client.PostAsync($"{BaseUrl}/mine", content);
 
-            return response.IsSuccessStatusCode;
+            string responseBody = await response.Content.ReadAsStringAsync();
+            string messaggio = await response.Content.ReadAsStringAsync();
+
+
+            return (response.IsSuccessStatusCode, messaggio);
         }
         // Metodo per inviare una nuova transazione alla blockchain, specificando mittente, destinatario e ammontare
         public async Task<bool> InviaTransazioneAsync(string mittente, string destinatario, int ammontare)
@@ -183,7 +187,7 @@ namespace Blockchain.Core
                 ProcessStartInfo start = new ProcessStartInfo
                 {
                     FileName = "python",
-                    Arguments = "blockchain_analyzer.py",
+                    Arguments = "python_analitiche/blockchain_analyzer.py",
                     UseShellExecute = false,
                     CreateNoWindow = true
                 };
