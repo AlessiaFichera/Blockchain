@@ -370,7 +370,7 @@ private Panel CreaSingoloBlocco(string timestamp, string hash, int nonce, List<T
     };
 
     // Hash abbreviato
-    string hashBreve = (hash.Length > 15) ? hash.Substring(0, 15) + "..." : hash;
+    string hashBreve = (hash.Length > 2) ? hash.Substring(0, 15) + "..." : hash;
     Label lblHash = new Label
     {
         Text = "Hash: " + hashBreve,
@@ -407,7 +407,7 @@ private Panel CreaSingoloBlocco(string timestamp, string hash, int nonce, List<T
         {
             Button btnLink = new Button
             {
-                Text = "• " + (tx.id?.Length > 12 ? tx.id.Substring(0, 12) + "..." : tx.id),
+                Text = "• " + (tx.id?.Length > 2 ? tx.id.Substring(0, 12) + "..." : tx.id),
                 Size = new Size(185, 25),
                 FlatStyle = FlatStyle.Flat,
                 TextAlign = ContentAlignment.MiddleLeft,
@@ -1042,7 +1042,7 @@ private void TransazioniGrafiche(List<TransactionData> transazioni)
         {
             testoIn += $"• TxID: {tx.vin[0].txid ?? "N/D"}\n";
             testoIn += $"• Vout Index: #{tx.vin[0].vout_index}\n";
-            testoIn += $"• Sorgente: {tx.vin[0].pubkey?.Substring(0, 40) ?? "N/D"}\n";
+            testoIn += $"• Sorgente: {tx.vin[0].pubkey?.Substring(0,10) ?? "N/D"}\n";
             testoIn += $"• Signature: {(string.IsNullOrEmpty(tx.vin[0].signature) ? "N/D" : "Presente")}";
         }
 
