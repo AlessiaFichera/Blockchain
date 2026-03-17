@@ -138,7 +138,7 @@ private void BtnAnalitiche_Click(object? sender, EventArgs e)
 {
     // Aggiorna eventuali dati tramite Python
     _blockchainManager.EseguiAggiornamentoPython();
-    string nomeFile = "analitiche.json";
+    string nomeFile = "python_analitiche/analitiche.json";
 
     if (File.Exists(nomeFile))
     {
