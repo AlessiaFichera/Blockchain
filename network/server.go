@@ -184,16 +184,22 @@ func (s *Server) runServer() {
 		case "HANDLE_TX":
 			if msg, ok := job.Data.(TxMessage); ok {
 				s.handleReceiveTx(msg)
+			} else {
+				fmt.Println("Errore: dati HANDLE_TX non validi")
 			}
 
 		case "HANDLE_INV":
 			if inv, ok := job.Data.(InvMessage); ok {
 				s.handleInv(inv)
+			} else {
+				fmt.Println("Errore: dati HANDLE_INV non validi")
 			}
 
 		case "HANDLE_GET_DATA":
 			if req, ok := job.Data.(GetDataMessage); ok {
 				s.handleGetData(req)
+			} else {
+				fmt.Println("Errore: dati HANDLE_GET_DATA non validi")
 			}
 
 		}
@@ -324,7 +330,9 @@ func (s *Server) handleCreateAddress(resChan chan any) {
 
 	fmt.Printf("[%s] Address creato: %s\n", s.NodeName, address)
 
-	resChan <- address
+	resChan <- AddressResponse{
+		Address: address,
+	}
 }
 
 func (s *Server) handleGetAddresses(resChan chan any) {
@@ -335,7 +343,10 @@ func (s *Server) handleGetAddresses(resChan chan any) {
 		addresses = []string{}
 	}
 
-	resChan <- addresses
+	resChan <- AddressesResponse{
+		Addresses: addresses,
+		Count:     len(addresses),
+	}
 }
 
 func (s *Server) handleActivateMine(address string, resChan chan any) {
@@ -447,7 +458,7 @@ func (s *Server) handleSendLocalTx(req TransactionRequest, resChan chan any) {
 	s.addToMempool(tx)
 
 	// Risponde all'utente che la creazione della tx è andata a buon fine
-	resChan <- TransactionResponse{
+	resChan <- SendTransactionResponse{
 		Status:  "success",
 		Message: "Transazione validata, firmata e inviata al Central Node",
 		TxID:    hex.EncodeToString(tx.ID),
@@ -491,9 +502,9 @@ func (s *Server) handleGetUTXOSet(resChan chan any) {
 		return
 	}
 
-	var utxoList []UTXOInfo
+	var utxoList []UTXOResponse
 	for _, u := range utxos {
-		info := UTXOInfo{
+		info := UTXOResponse{
 			TxID:       hex.EncodeToString(u.TxID),
 			Index:      u.Index,
 			Value:      u.TXOutput.Value,
@@ -503,7 +514,7 @@ func (s *Server) handleGetUTXOSet(resChan chan any) {
 	}
 
 	if utxoList == nil {
-		utxoList = []UTXOInfo{}
+		utxoList = []UTXOResponse{}
 	}
 
 	resChan <- UTXOSetResponse{
@@ -813,8 +824,8 @@ func (s *Server) checkMempoolFull() bool {
 }
 
 // Restituisce la Blockchain in formato JSON
-func (s *Server) getBlockchainJSON() ([]BlockInfo, error) {
-	var chain []BlockInfo
+func (s *Server) getBlockchainJSON() ([]BlockResponse, error) {
+	var chain []BlockResponse
 	it := s.Blockchain.Iterator()
 
 	for {
@@ -823,12 +834,12 @@ func (s *Server) getBlockchainJSON() ([]BlockInfo, error) {
 			return nil, fmt.Errorf("errore durante il recupero: %w", err)
 		}
 
-		var txsInfo []TransactionInfo
+		var txsInfo []TransactionResponse
 		for _, tx := range block.Transactions {
 
-			var vins []TXInputInfo
+			var vins []TXInputResponse
 			for _, vin := range tx.Vin {
-				vins = append(vins, TXInputInfo{
+				vins = append(vins, TXInputResponse{
 					Txid:      hex.EncodeToString(vin.Txid),
 					Vout:      vin.Vout,
 					Signature: hex.EncodeToString(vin.Signature),
@@ -836,22 +847,22 @@ func (s *Server) getBlockchainJSON() ([]BlockInfo, error) {
 				})
 			}
 
-			var vouts []TXOutputInfo
+			var vouts []TXOutputResponse
 			for _, vout := range tx.Vout {
-				vouts = append(vouts, TXOutputInfo{
+				vouts = append(vouts, TXOutputResponse{
 					Value:      vout.Value,
 					PubKeyHash: hex.EncodeToString(vout.PubKeyHash),
 				})
 			}
 
-			txsInfo = append(txsInfo, TransactionInfo{
+			txsInfo = append(txsInfo, TransactionResponse{
 				ID:   hex.EncodeToString(tx.ID),
 				Vin:  vins,
 				Vout: vouts,
 			})
 		}
 
-		info := BlockInfo{
+		info := BlockResponse{
 			Timestamp:    time.Unix(block.Timestamp, 0).Format("02/01/2006 15:04:05"),
 			PrevHash:     hex.EncodeToString(block.PrevBlockHash),
 			Hash:         hex.EncodeToString(block.Hash),
