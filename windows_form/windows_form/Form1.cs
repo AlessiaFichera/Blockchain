@@ -1,0 +1,1219 @@
+using System;
+using System.Drawing;
+using System.Windows.Forms;
+using System.Collections.Generic;
+using Blockchain.Core;
+using System.Text.Json;
+
+namespace Blockchain
+{
+    public partial class Form1 : Form
+    {
+        // Campi
+        private readonly BlockchainManager _blockchainManager;
+         private ComboBox? _selezioneFrom;
+        private ComboBox? _selezioneTo;
+        private ComboBox? _selezioneImporto;
+
+
+        public Form1()
+        {
+            InitializeComponent();
+
+            // Inizializzazione della logica
+            _blockchainManager = new BlockchainManager();
+
+            btnNode1.Click += Nodo_Click;
+            btnNode2.Click += Nodo_Click;
+            btnNode3.Click += Nodo_Click;
+            btnNode4.Click += Nodo_Click;
+
+            // 2. Gestione Eventi Standard
+            btnVisualizzaBlockchain.Click += BtnVisualizzaBlockchain_Click;
+            btnAggiungiWallet.Click += BtnAggiungiWallet_Click;
+            btnVisualizzaTransazione.Click += BtnVisualizzaTransazione_Click;
+            btnAnalitiche.Click += BtnAnalitiche_Click;
+            btnUTXOSet.Click += BtnUTXOSet_Click;
+            btncreaindirizzo.Click += btncreaindirizzo_Click;
+            btnInviaTransazione.Click += BtnInviaTransazione_Click;
+            btnIndietroWallet.Click += BtnAggiungiWallet_Click;
+            btnIndietroBlockchain.Click += BtnVisualizzaBlockchain_Click;
+            btnMining.Click += BtnMining_Click;
+
+        }
+
+      // --- HANDLER EVENTI ---
+
+// Handler per il click su un nodo della rete
+private void Nodo_Click(object? sender, EventArgs e)
+{
+    // Controlla che il sender sia un Button e abbia un Tag
+    if (sender is Button btn && btn.Tag != null)
+    {
+        string portaScelta = btn.Tag.ToString() ?? "";
+        
+        // 1. Impostiamo la porta corrente nel manager della blockchain
+        _blockchainManager.PortaCorrente = portaScelta;
+
+        // 2. Entriamo nel nodo selezionato
+        EntraNelNodo(portaScelta);
+    }
+}
+
+// Handler per il click sul pulsante "Invia Transazione"
+private async void BtnInviaTransazione_Click(object? sender, EventArgs e)
+{
+    // Prepara l'interfaccia grafica per l'invio
+    DisegnaInterfacciaInvio();
+    
+    // Carica i dati necessari per l'invio della transazione
+    await CaricaDatiPerInvio();
+}
+
+// Metodo che carica i dati per l'invio di una transazione
+private async Task CaricaDatiPerInvio()
+{
+    // Sincronizza la rubrica globale dei nodi
+    List<string> rubricaAggiornata = await _blockchainManager.SincronizzaRubricaGlobaleAsync();
+
+    // Estrai i wallet locali
+    WalletRoot? mieiWallet = await _blockchainManager.EstraiListaWallet();
+
+    if (mieiWallet?.Addresses == null)
+    {
+        MessageBox.Show("Errore nel recupero dei wallet.");
+        return;
+    }
+
+    // Lista degli indirizzi dei wallet locali
+    List<string> mieiIndirizzi = new List<string>();
+    if (mieiWallet != null && mieiWallet.Addresses != null)
+    {
+        mieiIndirizzi = mieiWallet.Addresses;
+    }
+
+    // Lista dei destinatari esterni (non miei indirizzi)
+    List<string> destinatariEsterni = new List<string>();
+    foreach (string addr in rubricaAggiornata)
+    {
+        if (!mieiIndirizzi.Contains(addr))
+        {
+            destinatariEsterni.Add(addr);
+        }
+    }
+
+    // Assegna i dati ai controlli UI se esistono
+    if (_selezioneFrom != null)
+    {
+        _selezioneFrom.DataSource = mieiIndirizzi;
+    }
+    if (_selezioneTo != null)
+    {
+        _selezioneTo.DataSource = destinatariEsterni;
+    }
+}
+
+// Handler per il click sul pulsante "Visualizza Blockchain"
+private async void BtnVisualizzaBlockchain_Click(object? sender, EventArgs e)
+{
+    // Prepara l'area di lavoro per la blockchain
+    PreparaAreaLavoro("BLOCKCHAIN");
+
+    try
+    {
+        // Sincronizza la blockchain e ottieni la lista dei blocchi
+        List<Blocks> blocchiRicevuti = await _blockchainManager.SincronizzaBlockchain();
+
+        // Carica i blocchi graficamente nell'interfaccia
+        CaricaBlocchiGrafici(blocchiRicevuti);
+    }
+    catch (Exception ex)
+    {
+        MessageBox.Show(ex.Message, "Errore Sincronizzazione", MessageBoxButtons.OK, MessageBoxIcon.Error);
+    }
+}
+
+// Handler per il click sul pulsante "Analitiche"
+private void BtnAnalitiche_Click(object? sender, EventArgs e)
+{
+    // Aggiorna eventuali dati tramite Python
+    _blockchainManager.EseguiAggiornamentoPython();
+    string nomeFile = "python_analitiche/analitiche.json";
+
+    if (File.Exists(nomeFile))
+    {
+        string contenutoJson = File.ReadAllText(nomeFile);
+        PreparaAreaLavoro("ANALITICHE");
+        VisualizzaStatistiche(contenutoJson);
+    }
+    else
+    {
+        MessageBox.Show("File analitiche.json non trovato!");
+    }
+}
+
+// Handler per il click sul pulsante "Mining"
+private async void BtnMining_Click(object? sender, EventArgs e)
+{
+    PreparaAreaLavoro("MINING");
+
+    // Disegna la sezione mining
+    await DisegnaSezioneMining();
+}
+
+// Handler per il click sul pulsante "Aggiungi Wallet"
+private async void BtnAggiungiWallet_Click(object? sender, EventArgs e)
+{
+    PreparaAreaLavoro("WALLET");
+
+    try
+    {
+        // Estrai la lista dei wallet
+        WalletRoot walletData = await _blockchainManager.EstraiListaWallet();
+
+        if (walletData != null)
+        {
+            if (walletData.Addresses == null || walletData.Addresses.Count == 0)
+            {
+                MessageBox.Show("Nessun wallet trovato nel nodo Go.");
+                return;
+            }
+        }
+        else
+        {
+            MessageBox.Show("Errore nel recupero dei wallet.");
+            return;
+        }
+
+        // Carica graficamente i wallet nell'interfaccia
+        CaricaWalletGrafici(walletData.Addresses, walletData.Count);
+    }
+    catch (Exception ex)
+    {
+        MessageBox.Show($"Errore di runtime: {ex.Message}");
+    }
+}
+
+// Handler per il click sul pulsante "Visualizza Transazioni"
+private async void BtnVisualizzaTransazione_Click(object? sender, EventArgs e)
+{
+    PreparaAreaLavoro("TUTTE LE TRANSAZIONI");
+
+    try
+    {
+        // Recupera la blockchain aggiornata
+        List<Blocks> catenaCompleta = await _blockchainManager.SincronizzaBlockchain();
+
+        // Estrai tutte le transazioni da tutti i blocchi
+        List<TransactionData> tutteLeTransazioni = new List<TransactionData>();
+        foreach (var blocco in catenaCompleta)
+        {
+            if (blocco.Transactions != null)
+            {
+                tutteLeTransazioni.AddRange(blocco.Transactions);
+            }
+        }
+
+        // Mostra le transazioni graficamente
+        TransazioniGrafiche(tutteLeTransazioni);
+    }
+    catch (Exception ex)
+    {
+        MessageBox.Show($"Errore nel recupero transazioni: {ex.Message}");
+    }
+}
+
+// Handler per il click sul pulsante "UTXO Set"
+private async void BtnUTXOSet_Click(object? sender, EventArgs e)
+{
+    _blockchainManager.EseguiAggiornamentoPython();
+    PreparaAreaLavoro("UTXOSET");
+
+    try
+    {
+        // Estrai l'UTXO set aggiornato
+        UtxoResponse risposta = await _blockchainManager.EstraiUTXOSet();
+
+        // Visualizza i dati
+        VisualizzaUTXOSet(risposta.count, risposta.Utxos);
+    }
+    catch (Exception ex)
+    {
+        MessageBox.Show($"Errore di runtime: {ex.Message}");
+    }
+}
+
+// Handler per il click sul pulsante "Crea Indirizzo"
+private async void btncreaindirizzo_Click(object? sender, EventArgs e)
+{
+    PreparaAreaLavoro("CREAINDIRIZZO");
+
+    try 
+    {
+        // Crea un nuovo indirizzo tramite il manager della blockchain
+        string nuovoIndirizzo = await _blockchainManager.CreateAddressAsync();
+
+        // Visualizza il nuovo indirizzo nell'interfaccia
+        VisualizzaNuovoIndirizzo(nuovoIndirizzo);
+    }
+    catch (Exception ex)
+    {
+        MessageBox.Show("Errore nel collegamento: " + ex.Message);
+    }
+}
+
+   
+// Handler per il bottone Home: torna alla schermata di selezione nodi
+private void BtnHome_Click(object? sender, EventArgs e)
+{
+    _blockchainManager.PortaCorrente = null; 
+    
+    pnlLogin.Visible = true;
+    pnlDettaglio.Visible = false;
+    pnlHeaderDettaglio.Visible = false;
+    pnlContainer.Visible = false;
+    pnlContainer.Controls.Clear();
+}
+ private void CaricaBlocchiGrafici(List<Blocks> catena)
+{
+    // Controllo base: se la lista è null o vuota, esci
+    if (catena == null || catena.Count == 0) return;
+
+    pnlContainer.Controls.Clear(); // Puliamo il pannello dei blocchi
+    pnlContainer.AutoScroll = true; // Abilitiamo lo scroll automatico
+    btnIndietroBlockchain.Visible = false; // Nascondiamo il pulsante indietro
+
+    // Metodo locale per confrontare blocchi per altezza
+    int ConfrontaBlocchiPerAltezza(Blocks a, Blocks b)
+    {
+        return a.Height.CompareTo(b.Height); // Ordinamento crescente per altezza
+    }
+
+    catena.Sort(ConfrontaBlocchiPerAltezza); // Ordiniamo la catena usando il delegato
+
+    // Determina l'altezza massima dei blocchi per disegnare frecce
+    int altezzaMassima = 0;
+    foreach (var b in catena)
+    {
+        if (b.Height > altezzaMassima) altezzaMassima = b.Height;
+    }
+
+    int coordinataX = 20; // Coordinata iniziale X per posizionare i blocchi
+
+    // Ciclo su tutti i blocchi per creare le card grafiche
+    foreach (var bloccoDati in catena)
+    {
+        Panel bloccoGrafico = CreaSingoloBlocco(
+            bloccoDati.Timestamp.ToString(),
+            bloccoDati.Hash,
+            bloccoDati.Nonce,
+            bloccoDati.Transactions,
+            bloccoDati.Height
+        );
+
+        // Posizioniamo il blocco nella UI
+        bloccoGrafico.Location = new Point(coordinataX, 50);
+        pnlContainer.Controls.Add(bloccoGrafico);
+
+        // Se non è l'ultimo blocco, disegna una freccia verso il successivo
+        if (bloccoDati.Height < altezzaMassima)
+        {
+            Label freccia = new Label
+            {
+                Text = "➔",
+                ForeColor = Color.FromArgb(41, 171, 226),
+                Font = new Font("Segoe UI", 20, FontStyle.Bold),
+                Location = new Point(coordinataX + 230, 180), 
+                AutoSize = true,
+                BackColor = Color.Transparent
+            };
+            pnlContainer.Controls.Add(freccia);
+            freccia.BringToFront(); // Porta la freccia in primo piano
+        }
+
+        coordinataX += 285; // Spazio tra blocchi
+    }
+}
+
+// --- CREA SINGOLO BLOCCO GRAFICO ---
+private Panel CreaSingoloBlocco(string timestamp, string hash, int nonce, List<TransactionData>? transactions, int height)
+{
+    // Pannello principale della card
+    Panel card = new Panel
+    {
+        Size = new Size(230, 280),
+        BackColor = Color.White,
+        BorderStyle = BorderStyle.FixedSingle
+    };
+
+    // Header con numero blocco
+    Label lblHeader = new Label
+    {
+        Text = "🔒 BLOCK #" + height,
+        BackColor = Color.FromArgb(41, 171, 226),
+        ForeColor = Color.White,
+        Dock = DockStyle.Top,
+        Height = 35,
+        TextAlign = ContentAlignment.MiddleCenter,
+        Font = new Font("Segoe UI", 10, FontStyle.Bold)
+    };
+
+    // Timestamp del blocco
+    Label lblTimestamp = new Label
+    {
+        Text = "Data: " + timestamp,
+        ForeColor = Color.DimGray,
+        Location = new Point(10, 45), 
+        Size = new Size(200, 20),
+        TextAlign = ContentAlignment.MiddleLeft,
+        Font = new Font("Segoe UI", 8)
+    };
+
+    // Hash abbreviato
+    string hashBreve = (hash.Length > 15) ? hash.Substring(0, 15) + "..." : hash;
+    Label lblHash = new Label
+    {
+        Text = "Hash: " + hashBreve,
+        Location = new Point(10, 70),
+        Size = new Size(200, 20),
+        ForeColor = Color.Black,
+        Font = new Font("Segoe UI", 8, FontStyle.Bold)
+    };
+
+    // Titolo transazioni
+    Label lblTitoloTrans = new Label
+    {
+        Text = "Transazioni:",
+        Location = new Point(10, 100),
+        Size = new Size(200, 15),
+        Font = new Font("Segoe UI", 8, FontStyle.Underline)
+    };
+
+    // Contenitore transazioni con scroll
+    FlowLayoutPanel flowTrans = new FlowLayoutPanel
+    {
+        Location = new Point(10, 120),
+        Size = new Size(210, 100),
+        BackColor = Color.FromArgb(245, 245, 245),
+        AutoScroll = true,
+        FlowDirection = FlowDirection.TopDown,
+        WrapContents = false
+    };
+
+    // Aggiunta pulsanti per ogni transazione
+    if (transactions != null && transactions.Count > 0)
+    {
+        foreach (var tx in transactions)
+        {
+            Button btnLink = new Button
+            {
+                Text = "• " + (tx.id?.Length > 12 ? tx.id.Substring(0, 12) + "..." : tx.id),
+                Size = new Size(185, 25),
+                FlatStyle = FlatStyle.Flat,
+                TextAlign = ContentAlignment.MiddleLeft,
+                ForeColor = Color.Blue,
+                Cursor = Cursors.Hand,
+                Font = new Font("Consolas", 8, FontStyle.Underline),
+                Tag = tx.id // Metadata per recupero ID transazione
+            };
+            btnLink.FlatAppearance.BorderSize = 0;
+            btnLink.Click += LinkTransazione_Click; // Event handler
+            flowTrans.Controls.Add(btnLink);
+        }
+    }
+
+    // Nonce del blocco
+    Label lblNonce = new Label
+    {
+        Text = "Nonce: " + nonce,
+        Location = new Point(10, 230),
+        Size = new Size(200, 25),
+        TextAlign = ContentAlignment.MiddleRight,
+        Font = new Font("Segoe UI", 8, FontStyle.Italic)
+    };
+
+    // Aggiunta componenti al pannello principale
+    card.Controls.Add(lblHeader);
+    card.Controls.Add(lblTimestamp);
+    card.Controls.Add(lblHash);
+    card.Controls.Add(lblTitoloTrans);
+    card.Controls.Add(flowTrans);
+    card.Controls.Add(lblNonce);
+
+    return card; // Restituisce il blocco grafico pronto
+}
+
+// --- CLICK SU LINK TRANSZIONE ---
+private async void LinkTransazione_Click(object? sender, EventArgs e)
+{
+    btnIndietroBlockchain.Visible = true; // Mostriamo il pulsante indietro
+
+    if (sender is Button btn && btn.Tag != null)
+    {
+        string idCercato = btn.Tag.ToString()!;
+
+        try
+        {
+            // Recupero della blockchain
+            List<Blocks> catena = await _blockchainManager.SincronizzaBlockchain();
+            TransactionData? txTrovata = null;
+
+            // Ciclo su blocchi e transazioni
+            foreach (Blocks b in catena)
+            {
+                if (b.Transactions != null)
+                {
+                    foreach (TransactionData t in b.Transactions)
+                    {
+                        if (t.id == idCercato)
+                        {
+                            txTrovata = t;
+                            break; // Trovata! Esco dal ciclo interno
+                        }
+                    }
+                }
+                if (txTrovata != null) break; // Trovata! Esco dal ciclo esterno
+            }
+
+            if (txTrovata != null)
+            {
+                PreparaAreaLavoro("DETTAGLIO TRANSAZIONE");
+                TransazioniGrafiche(new List<TransactionData> { txTrovata });
+            }
+            else
+            {
+                MessageBox.Show("Transazione non trovata nel registro.");
+            }
+        }
+        catch (Exception ex)
+        {
+            MessageBox.Show("Errore durante l'ispezione dei Metadata: " + ex.Message);
+        }
+    }
+}  
+
+// Metodo che visualizza statistiche e grafici della blockchain
+private void VisualizzaStatistiche(string jsonContenuto)
+{
+    
+    pnlContainer.Controls.Clear();
+
+    // Estraiamo le statistiche dal JSON
+    var stats = _blockchainManager.EstraiAnalitiche(jsonContenuto);
+
+    if (stats == null || stats.Count == 0)
+        return;
+
+    int coordinataX = 20;
+    pnlContainer.AutoScroll = true;
+
+    // Lista per tutte le statistiche normali
+    List<Analitica> altreStats = new List<Analitica>();
+
+    Analitica? statRicchi = null;
+
+    // Separiamo le statistiche normali da quella dei wallet ricchi
+    foreach (var s in stats)
+    {
+        if (s.Titolo.Contains("Ricchi") || s.Titolo.Contains("Indirizzi"))
+        {
+            statRicchi = s;
+        }
+        else
+        {
+            altreStats.Add(s);
+        }
+    }
+
+    // Creazione delle CARD statistiche
+    foreach (var s in altreStats)
+    {
+        Panel card = new Panel
+        {
+            Size = new Size(170, 100),
+            Location = new Point(coordinataX, 50),
+            BackColor = Color.White,
+            BorderStyle = BorderStyle.FixedSingle
+        };
+
+
+        Label lblTitolo = new Label
+        {
+            Text = s.Titolo.ToUpper(),
+            Dock = DockStyle.Top,
+            Height = 40,
+            TextAlign = ContentAlignment.BottomCenter,
+            Font = new Font("Segoe UI", 9, FontStyle.Bold),
+            ForeColor = Color.Blue
+        };
+
+    
+        Label lblValore = new Label
+        {
+            Text = s.Valore,
+            Dock = DockStyle.Fill,
+            TextAlign = ContentAlignment.TopCenter,
+            Font = new Font("Segoe UI", 11, FontStyle.Bold),
+            ForeColor = Color.Black
+        };
+
+        card.Controls.Add(lblValore);
+        card.Controls.Add(lblTitolo);
+
+        pnlContainer.Controls.Add(card);
+
+        
+        coordinataX += 190;
+    }
+
+    int yOffset = 180;
+
+    
+    if (statRicchi != null)
+    {
+        Panel leaderboard = new Panel
+        {
+            Size = new Size(500, 140),
+            Location = new Point(120, yOffset),
+            BackColor = Color.White,
+            BorderStyle = BorderStyle.FixedSingle
+        };
+
+        
+        Label lblTitolo = new Label
+        {
+            Text = "🏆 TOP 3 INDIRIZZI PIÙ RICCHI",
+            Dock = DockStyle.Top,
+            Height = 30,
+            TextAlign = ContentAlignment.MiddleCenter,
+            Font = new Font("Segoe UI", 10, FontStyle.Bold),
+            ForeColor = Color.Blue
+        };
+
+    
+        Label lblDati = new Label
+        {
+            Text = statRicchi.Valore,
+            Dock = DockStyle.Fill,
+            TextAlign = ContentAlignment.MiddleCenter,
+            Font = new Font("Consolas", 9, FontStyle.Bold),
+            ForeColor = Color.Black
+        };
+
+        leaderboard.Controls.Add(lblDati);
+        leaderboard.Controls.Add(lblTitolo);
+
+        pnlContainer.Controls.Add(leaderboard);
+
+        yOffset += 160;
+    }
+
+    
+    Size sizeGrafico1 = new Size(700, 400);
+    Size sizeGrafico = new Size(700, 350);
+
+    
+    AggiungiGrafico("python_analitiche/grafico_blockchain.png", yOffset, sizeGrafico1);
+    AggiungiGrafico("python_analitiche/grafico_nonce.png", yOffset + 450, sizeGrafico);
+}
+
+
+// Metodo modificato per evitare il blocco del file (File Lock)
+private void AggiungiGrafico(string path, int y, Size size)
+{
+    if (File.Exists(path))
+    {
+        PictureBox pic = new PictureBox
+        {
+            Location = new Point(20, y),
+            Size = size,
+            SizeMode = PictureBoxSizeMode.Zoom
+        };
+
+        try
+        {
+            // Leggiamo i byte del file
+            byte[] imageBytes = File.ReadAllBytes(path);
+            
+            // Usiamo un MemoryStream per creare l'immagine senza bloccare il file originale
+            using (MemoryStream ms = new MemoryStream(imageBytes))
+            {
+                // Creiamo una copia dell'immagine in memoria
+                pic.Image = Image.FromStream(ms);
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Errore nel caricamento del grafico: {ex.Message}");
+            return;
+        }
+
+        pnlContainer.Controls.Add(pic);
+    }
+}
+
+// Metodo che carica la lista dei wallet
+private void CaricaWalletGrafici(List<string> walletList, int count)
+{
+    pnlContainer.Controls.Clear();
+    pnlContainer.AutoScroll = true;
+
+    btnIndietroWallet.Visible = false;
+
+    pnlContainer.BackColor = Color.FromArgb(30, 33, 40);
+
+    
+    Label lblTitolo = new Label
+    {
+        Text = $"Wallet Disponibili: {count}",
+        Font = new Font("Segoe UI", 14, FontStyle.Bold),
+        ForeColor = Color.White,
+        Location = new Point(20, 15),
+        AutoSize = true
+    };
+
+    pnlContainer.Controls.Add(lblTitolo);
+
+    int coordinataY = 60;
+
+    // Creiamo una card per ogni wallet
+    foreach (var wallet in walletList)
+    {
+        Panel walletCard = new Panel
+        {
+            Size = new Size(pnlContainer.Width - 60, 80),
+            BackColor = Color.FromArgb(45, 50, 60),
+            Location = new Point(20, coordinataY),
+            Padding = new Padding(10)
+        };
+
+        
+        Label lblTag = new Label
+        {
+            Text = "WALLET",
+            Font = new Font("Segoe UI", 7, FontStyle.Bold),
+            ForeColor = Color.FromArgb(0, 122, 204),
+            Location = new Point(15, 12),
+            AutoSize = true
+        };
+
+        // Indirizzo wallet
+        Label lblAddress = new Label
+        {
+            Text = wallet ?? "N/D",
+            ForeColor = Color.White,
+            Font = new Font("Consolas", 10),
+            Location = new Point(15, 35),
+            Size = new Size(walletCard.Width - 200, 30),
+            TextAlign = ContentAlignment.MiddleLeft
+        };
+
+        // Bottone per visualizzare saldo
+        Button btnSaldo = new Button
+        {
+            Text = "SALDO",
+            Size = new Size(130, 35),
+            Location = new Point(walletCard.Width - 150, 22),
+            BackColor = Color.FromArgb(0, 122, 204),
+            ForeColor = Color.White,
+            FlatStyle = FlatStyle.Flat,
+            Cursor = Cursors.Hand,
+
+            // Salviamo l'indirizzo nel Tag per usarlo nel click
+            Tag = wallet
+        };
+
+        // Evento click del bottone
+        btnSaldo.Click += BtnSaldo_Click;
+
+        walletCard.Controls.Add(btnSaldo);
+        walletCard.Controls.Add(lblTag);
+        walletCard.Controls.Add(lblAddress);
+
+        pnlContainer.Controls.Add(walletCard);
+
+        coordinataY += 95;
+    }
+}
+
+
+// Evento click bottone SALDO
+private async void BtnSaldo_Click(object? sender, EventArgs e)
+{
+    if (sender is Button btn && btn.Tag is string indirizzo)
+    {
+        // Richiesta saldo blockchain
+        BalanceResponse risposta =
+            await _blockchainManager.OttieniSaldoCompletoAsync(indirizzo);
+
+        string wallet = "";
+        string saldo = "0";
+
+        if (risposta != null)
+        {
+            if (risposta.Address != null)
+                wallet = risposta.Address;
+
+            if (risposta.Result != null)
+                saldo = risposta.Result;
+        }
+
+        
+        VisualizzaDettaglioSaldo(wallet, saldo);
+    }
+}
+private void VisualizzaDettaglioSaldo(string indirizzo, string saldo)
+{
+    
+    pnlContainer.Controls.Clear();
+    pnlContainer.BackColor = Color.FromArgb(20, 22, 29); 
+
+
+    Label lblInfo = new Label
+    {
+        Text = "SALDO ATTUALE",
+        Font = new Font("Segoe UI", 14, FontStyle.Bold),
+        ForeColor = Color.White,
+        Location = new Point(25, 25),
+        AutoSize = true
+    };
+
+    
+    Panel resCard = new Panel
+    {
+        Size = new Size(pnlContainer.Width - 50, 160),
+        Location = new Point(25, 75),
+        BackColor = Color.FromArgb(32, 36, 47), 
+        Padding = new Padding(20)
+    };
+
+    
+    Label lblIndirizzoTitolo = new Label {
+        Text = "INDIRIZZO WALLET",
+        Font = new Font("Segoe UI", 8, FontStyle.Bold),
+        ForeColor = Color.FromArgb(0, 122, 204), 
+        Location = new Point(20, 20),
+        AutoSize = true
+    };
+
+    Label lblIndirizzoValore = new Label {
+        Text = indirizzo,
+        ForeColor = Color.White,
+        Font = new Font("Consolas", 11),
+        Location = new Point(20, 45),
+        Size = new Size(resCard.Width - 40, 30),
+        TextAlign = ContentAlignment.MiddleLeft
+    };
+
+    Label lblSaldoTitolo = new Label {
+        Text = "DISPONIBILITÀ ATTUALE",
+        Font = new Font("Segoe UI", 8, FontStyle.Bold),
+        ForeColor = Color.Gray,
+        Location = new Point(20, 100),
+        AutoSize = true
+    };
+
+    Label lblSaldoValore = new Label {
+        Text = $"{saldo} BTC",
+        ForeColor = Color.FromArgb(255, 165, 0), 
+        Font = new Font("Segoe UI", 16, FontStyle.Bold),
+        Location = new Point(20, 120),
+        AutoSize = true
+    };
+
+    // Assemblaggio dei componenti orientati agli oggetti
+    resCard.Controls.Add(lblIndirizzoTitolo);
+    resCard.Controls.Add(lblIndirizzoValore);
+    resCard.Controls.Add(lblSaldoTitolo);
+    resCard.Controls.Add(lblSaldoValore);
+    
+    pnlContainer.Controls.Add(lblInfo);
+    pnlContainer.Controls.Add(resCard);
+    btnIndietroWallet.Visible = true;
+    
+}
+
+private void DisegnaInterfacciaInvio()
+{
+    pnlContainer.Controls.Clear();
+
+    Label lblTitolo = new Label {
+        Text = "INVIA TRANSAZIONE:",
+        Font = new Font("Segoe UI", 14, FontStyle.Bold),
+        ForeColor = Color.White,
+        Location = new Point(30, 20),
+        AutoSize = true
+    };
+
+    _selezioneFrom = new ComboBox { 
+        Location = new Point(30, 90), 
+        Size = new Size(400, 30), 
+        DropDownStyle = ComboBoxStyle.DropDownList, 
+        BackColor = Color.White 
+    };
+
+    _selezioneTo = new ComboBox { 
+        Location = new Point(30, 160),
+        Size = new Size(400, 30), 
+        DropDownStyle = ComboBoxStyle.DropDownList, 
+        BackColor = Color.White 
+    };
+    
+    _selezioneImporto = new ComboBox { 
+        Location = new Point(30, 230), 
+        Size = new Size(150, 30), 
+        DropDownStyle = ComboBoxStyle.DropDownList, 
+        BackColor = Color.White 
+    };
+    for (int i = 1; i <= 10; i++) _selezioneImporto.Items.Add(i);
+    _selezioneImporto.SelectedIndex = 0;
+
+    Button btnSoloInvia = new Button {
+        Text = "INVIA TRANSAZIONE",
+        Location = new Point(30, 280),
+        Size = new Size(190, 45),
+        BackColor = Color.DodgerBlue,
+        ForeColor = Color.White,
+        FlatStyle = FlatStyle.Flat,
+        Font = new Font("Segoe UI", 9, FontStyle.Bold),
+        Cursor = Cursors.Hand
+    };
+    btnSoloInvia.Click += BtnSoloInvia_Click;
+
+
+    pnlContainer.Controls.Add(new Label { 
+        Text = "DA (Mio Wallet):", 
+        Location = new Point(30, 70), 
+        ForeColor = Color.White, AutoSize = true });
+    pnlContainer.Controls.Add(_selezioneFrom);
+    
+    pnlContainer.Controls.Add(new Label { 
+        Text = "A (Destinatario):", 
+        Location = new Point(30, 140), 
+        ForeColor = Color.White, AutoSize = true });
+    pnlContainer.Controls.Add(_selezioneTo);
+    
+    pnlContainer.Controls.Add(new Label { 
+        Text = "Seleziona Importo:", 
+        Location = new Point(30, 210), 
+        ForeColor = Color.White, AutoSize = true });
+    pnlContainer.Controls.Add(_selezioneImporto);
+    
+     pnlContainer.Controls.Add(lblTitolo);
+    pnlContainer.Controls.Add(btnSoloInvia);
+    pnlContainer.Refresh();
+}
+
+private async void BtnSoloInvia_Click(object? sender, EventArgs e)
+{
+    
+    if (_selezioneFrom?.SelectedItem == null || _selezioneTo?.SelectedItem == null || _selezioneImporto?.SelectedItem == null)
+    {
+        MessageBox.Show("Seleziona mittente, destinatario e importo!");
+        return;
+    }
+
+    string from = _selezioneFrom.SelectedItem.ToString()!;
+    string to = _selezioneTo.SelectedItem.ToString()!;
+    
+
+    int ammontare = Convert.ToInt32(_selezioneImporto.SelectedItem);
+
+    bool successo = await _blockchainManager.InviaTransazioneAsync(from, to, ammontare);
+
+    if (successo)
+    {
+        MessageBox.Show("Transazione inviata con successo!");
+    }
+    else
+    {
+        MessageBox.Show("Errore nell'invio. Verifica se hai minato abbastanza coin prima!");
+    }
+}
+
+private async Task DisegnaSezioneMining()
+{
+    pnlContainer.Controls.Clear();
+    pnlContainer.BackColor = Color.FromArgb(30, 33, 40); 
+
+    Label lblTitolo = new Label {
+        Text = "SCEGLI TRA I TUOI INDIRIZZI CHI DEVE ESSERE MINER:",
+        Font = new Font("Segoe UI", 14, FontStyle.Bold),
+        ForeColor = Color.White, 
+        Location = new Point(30, 20),
+        AutoSize = true
+    };
+
+    _selezioneFrom = new ComboBox {
+        Location = new Point(30, 70),
+        Size = new Size(350, 30),
+        DropDownStyle = ComboBoxStyle.DropDownList,
+        Font = new Font("Segoe UI", 10)
+    };
+
+    
+    // Recuperiamo i  wallet come oggetto WalletRoot
+    WalletRoot mieiWallet = await _blockchainManager.EstraiListaWallet();
+    if (mieiWallet != null && mieiWallet.Addresses != null)
+    {
+     List<string> mieiIndirizzi = mieiWallet.Addresses;
+     _selezioneFrom.DataSource = mieiIndirizzi;
+    }
+
+    Button btnSoloMining = new Button {
+        Text = "ESEGUI MINING",
+        Location = new Point(30, 120),
+        Size = new Size(190, 45),
+        BackColor = Color.Orange,
+        FlatStyle = FlatStyle.Flat,
+        Font = new Font("Segoe UI", 9, FontStyle.Bold),
+        Cursor = Cursors.Hand
+    };
+    btnSoloMining.Click += BtnSoloMining_Click;
+
+    pnlContainer.Controls.Add(lblTitolo);
+    pnlContainer.Controls.Add(_selezioneFrom);
+    pnlContainer.Controls.Add(btnSoloMining);
+}
+private async void BtnSoloMining_Click(object? sender, EventArgs e)
+{
+    // Verifica che ci sia un indirizzo selezionato
+    if (_selezioneFrom?.SelectedItem == null) 
+    {
+        MessageBox.Show("Seleziona un indirizzo per ricevere il premio di mining.");
+        return;
+    }
+
+    string indirizzo = _selezioneFrom.SelectedItem.ToString()!;
+
+    (bool successo,string messaggio) = await _blockchainManager.EseguiMiningAsync(indirizzo);
+   
+    if (successo)
+    {
+        MessageBox.Show("Mining: " + messaggio);
+    }
+    else
+    {
+        MessageBox.Show("Mining fallito: " + messaggio);
+    }
+
+    if (sender is Button btnRipristina) 
+    {
+        btnRipristina.Enabled = true;
+        btnRipristina.Text = "ESEGUI MINING";
+    }
+}
+// Metodo che visualizza graficamente le transazioni
+private void TransazioniGrafiche(List<TransactionData> transazioni)
+{
+    pnlContainer.Controls.Clear();
+    pnlContainer.AutoScroll = true;
+
+    int coordinataY = 20;
+
+    // Ciclo su tutte le transazioni
+    foreach (var tx in transazioni)
+    {
+        
+        Panel card = new Panel
+        {
+            Size = new Size(pnlContainer.Width - 60, 250),
+            BackColor = Color.White,
+            BorderStyle = BorderStyle.FixedSingle,
+            Location = new Point(20, coordinataY)
+        };
+
+    
+        Label lblId = new Label
+        {
+            Text = "ID-TRANSAZIONE: " + tx.id,
+            Dock = DockStyle.Top,
+            Height = 40,
+            BackColor = Color.FromArgb(242, 242, 242),
+            Font = new Font("Consolas", 9, FontStyle.Bold),
+            TextAlign = ContentAlignment.MiddleLeft,
+            Padding = new Padding(10, 0, 10, 0)
+        };
+
+        
+        string testoIn = " INPUT (Provenienza):\n";
+
+        if (tx.vin != null && tx.vin.Count > 0)
+        {
+            testoIn += $"• TxID: {tx.vin[0].txid ?? "N/D"}\n";
+            testoIn += $"• Vout Index: #{tx.vin[0].vout_index}\n";
+            testoIn += $"• Sorgente: {tx.vin[0].pubkey?.Substring(0, 40) ?? "N/D"}\n";
+            testoIn += $"• Signature: {(string.IsNullOrEmpty(tx.vin[0].signature) ? "N/D" : "Presente")}";
+        }
+
+        Label lblInput = new Label
+        {
+            Text = testoIn,
+            Location = new Point(15, 50),
+            Size = new Size(card.Width - 30, 80),
+            ForeColor = Color.Firebrick,
+            Font = new Font("Segoe UI", 9, FontStyle.Bold)
+        };
+
+        
+        string testoOut = " OUTPUT (Destinazione):\n";
+
+        if (tx.vout != null && tx.vout.Count > 0)
+        {
+            testoOut += $"• Destinatario: {tx.vout[0].pubkey_hash}\n";
+            testoOut += $"• Importo: {tx.vout[0].value} BTC";
+        }
+
+        Label lblOutput = new Label
+        {
+            Text = testoOut,
+            Location = new Point(15, 160),
+            Size = new Size(card.Width - 30, 80),
+            ForeColor = Color.ForestGreen,
+            Font = new Font("Segoe UI", 9, FontStyle.Bold)
+        };
+
+        
+        card.Controls.Add(lblOutput);
+        card.Controls.Add(lblInput);
+        card.Controls.Add(lblId);
+
+        
+        pnlContainer.Controls.Add(card);
+
+        
+        coordinataY += 265;
+    }
+}
+
+
+// Metodo che visualizza l'UTXO Set
+private void VisualizzaUTXOSet(int count, List<Utxo> utxoset)
+{
+    pnlContainer.Controls.Clear();
+    pnlContainer.AutoScroll = true;
+
+    
+    pnlContainer.BackColor = Color.FromArgb(30, 30, 30);
+
+    
+    Label lblTitolo = new Label
+    {
+        Text = $"DISPONIBILITÀ UTXO: {count}",
+        Font = new Font("Segoe UI", 16, FontStyle.Bold),
+        ForeColor = Color.FromArgb(41, 171, 226),
+        Location = new Point(20, 15),
+        AutoSize = true
+    };
+
+    pnlContainer.Controls.Add(lblTitolo);
+
+    int coordinataY = 65;
+
+    // Ciclo su tutti gli UTXO
+    foreach (var utxo in utxoset)
+    {
+        
+        Panel utxoCard = new Panel
+        {
+            Size = new Size(580, 140),
+            BackColor = Color.White,
+            Location = new Point(20, coordinataY)
+        };
+
+        
+        string IdBreve = (utxo.tx_id?.Length > 15)
+            ? utxo.tx_id.Substring(0, 30) + "..."
+            : utxo.tx_id ?? "N/D";
+
+        
+        Label lblHeader = new Label
+        {
+            Text = $" TX-ID: {IdBreve}",
+            Font = new Font("Consolas", 10, FontStyle.Bold),
+            BackColor = Color.FromArgb(240, 240, 240),
+            ForeColor = Color.DarkSlateBlue,
+            Dock = DockStyle.Top,
+            Height = 30,
+            TextAlign = ContentAlignment.MiddleLeft
+        };
+
+        Label lblValore = new Label
+        {
+            Text = $"{utxo.value} BTC",
+            Font = new Font("Segoe UI", 18, FontStyle.Bold),
+            ForeColor = Color.ForestGreen,
+            Location = new Point(15, 40),
+            Size = new Size(200, 50)
+        };
+
+        
+        Label lblInfo = new Label
+        {
+            Text = $"Index: #{utxo.index}\nProprietario: {utxo.pub_key_hash}",
+            Font = new Font("Consolas", 9, FontStyle.Regular),
+            ForeColor = Color.Gray,
+            Location = new Point(18, 85),
+            Size = new Size(550, 40)
+        };
+
+        
+        utxoCard.Controls.Add(lblInfo);
+        utxoCard.Controls.Add(lblValore);
+        utxoCard.Controls.Add(lblHeader);
+
+        
+        pnlContainer.Controls.Add(utxoCard);
+
+        coordinataY += 155;
+    }
+}
+
+
+// Metodo che mostra il nuovo indirizzo generato
+private void VisualizzaNuovoIndirizzo(string indirizzo)
+{
+
+    pnlContainer.Controls.Clear();
+    pnlContainer.AutoScroll = true;
+
+    
+    Panel addressCard = new Panel
+    {
+        Size = new Size(400, 100),
+        BackColor = Color.White,
+        BorderStyle = BorderStyle.FixedSingle,
+        Location = new Point(20, 20)
+    };
+
+    
+    Label lblHeader = new Label
+    {
+        Text = "NUOVO INDIRIZZO GENERATO",
+        Font = new Font("Segoe UI", 10, FontStyle.Bold),
+        ForeColor = Color.White,
+        BackColor = Color.FromArgb(0, 120, 215),
+        Dock = DockStyle.Top,
+        Height = 30,
+        TextAlign = ContentAlignment.MiddleCenter
+    };
+
+    
+    Label lblAddress = new Label
+    {
+        Text = indirizzo,
+        ForeColor = Color.FromArgb(45, 45, 45),
+        Font = new Font("Consolas", 11, FontStyle.Bold),
+        Location = new Point(10, 45),
+        Size = new Size(380, 40),
+        TextAlign = ContentAlignment.MiddleCenter
+    };
+
+    addressCard.Controls.Add(lblAddress);
+    addressCard.Controls.Add(lblHeader);
+
+    pnlContainer.Controls.Add(addressCard);
+}
+    
+    }
+}

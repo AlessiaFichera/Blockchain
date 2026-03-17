@@ -1,0 +1,20 @@
+{
+    "statistiche": {
+        "tempo_medio_mining": 427.0,
+        "totale_transazioni": 7,
+        "valore_medio_btc": 6.67,
+        "difficolta_media": 2.5,
+        "top_ricchi": [
+            [
+                "322abdb294603552e6fd90f505e6b8f89d458a4c",
+                31.0
+            ],
+            [
+                "0aeaa1cdf70e732e34a2105d6aadc4d5b03c35cb",
+                9.0
+            ]
+        ]
+    },
+    "file_grafico": "python_analitiche/grafico_blockchain.png",
+    "sforzo_nonce": "python_analitiche/grafico_nonce.png"
+}
