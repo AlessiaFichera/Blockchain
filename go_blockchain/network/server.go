@@ -67,7 +67,7 @@ type GetDataMessage struct {
 }
 
 // Avvia il server per gestire le richieste che accedono al DB sequenzialmente
-func StartServer(storage core.Storage, walletFile string, nodeName string, nodeAddress string) (*Server, error) {
+func StartServer(walletFile string, nodeName string, nodeAddress string) (*Server, error) {
 
 	wallet, err := core.NewWallet(walletFile)
 	if err != nil {
@@ -83,44 +83,48 @@ func StartServer(storage core.Storage, walletFile string, nodeName string, nodeA
 		Mempool:     make(map[string]*core.Transaction),
 	}
 
-	if server.NodeName == centralNode {
+	go server.runServer()
 
-		listAddresses := server.Wallet.GetAddresses()
+	return server, nil
 
+}
+
+func (s *Server) Bootstrap(storage core.Storage) error {
+	if s.NodeName == centralNode {
 		var address string
+		var err error
+
+		listAddresses := s.Wallet.GetAddresses()
 		if len(listAddresses) > 0 {
 			address = listAddresses[0]
 		} else {
-			address, err = server.Wallet.AddAccount()
+			address, err = s.Wallet.AddAccount()
 			if err != nil {
-				return nil, err
+				return err
 			}
-			fmt.Printf("[%s] Nuovo account creato: %s\n", server.NodeName, address)
+			fmt.Printf("[%s] Nuovo account creato: %s\n", s.NodeName, address)
 		}
 
 		bc, err := core.NewBlockchainWithGB(address, storage)
 		if err != nil {
-			return nil, err
+			return err
 		}
 
-		server.Blockchain = bc
+		s.Blockchain = bc
 
 	} else {
 
 		bc, err := core.NewBlockchain(storage)
 		if err != nil {
-			return nil, err
+			return err
 		}
 
-		server.Blockchain = bc
+		s.Blockchain = bc
 
-		server.sendVersion(centralNodeAddress)
+		s.sendVersion(centralNodeAddress)
 	}
 
-	go server.runServer()
-
-	return server, nil
-
+	return nil
 }
 
 func (s *Server) runServer() {
@@ -576,9 +580,6 @@ func (s *Server) handleGetBlocks(msg GetBlocksMessage) {
 
 		blocksToSend = append(blocksToSend, block)
 
-		if len(block.PrevBlockHash) == 0 {
-			break
-		}
 	}
 
 	// Inversione ordine
@@ -653,7 +654,7 @@ func (s *Server) handleBlocks(msg BlocksMessage) {
 		s.cleanMempool(block.Transactions)
 		localHeight++
 
-		if s.NodeName == centralNode && !s.isMiner() {
+		if s.NodeName == centralNode {
 			fmt.Printf("[%s] Central Node propaga il blocco agli altri peer...\n", s.NodeName)
 			s.sendBroadcastInv("block", block.Hash, "")
 		}
@@ -832,6 +833,9 @@ func (s *Server) getBlockchainJSON() ([]BlockResponse, error) {
 		block, err := it.Next()
 		if err != nil {
 			return nil, fmt.Errorf("errore durante il recupero: %w", err)
+		}
+		if block == nil {
+			break
 		}
 
 		var txsInfo []TransactionResponse

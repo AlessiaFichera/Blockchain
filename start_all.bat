@@ -23,6 +23,16 @@ echo Nodo central-node attivo.
 REM Avviare node1
 echo Avvio node1...
 docker-compose up -d --build node1
+timeout /t 5 >nul
+
+REM Avviare node2
+echo Avvio node2...
+docker-compose up -d --build node2
+timeout /t 5 >nul
+
+REM Avviare node3
+echo Avvio node3...
+docker-compose up -d --build node3
 
 REM Entrare nella cartella windows_form
 cd ../windows_form || (echo Cartella windows_form non trovata & exit /b)

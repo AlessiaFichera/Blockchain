@@ -106,12 +106,11 @@ func (bc *Blockchain) GetBlockchain() ([]string, error) {
 		if err != nil {
 			return nil, fmt.Errorf("errore durante la stampa: %w", err)
 		}
-
-		chain = append(chain, block.String())
-
-		if len(block.PrevBlockHash) == 0 {
+		if block == nil {
 			break
 		}
+
+		chain = append(chain, block.String())
 	}
 	return chain, nil
 }
@@ -126,14 +125,14 @@ func (bc *Blockchain) FindTransaction(ID []byte) (Transaction, error) {
 			return Transaction{}, err
 		}
 
+		if block == nil {
+			break
+		}
+
 		for _, tx := range block.Transactions {
 			if bytes.Equal(tx.ID, ID) {
 				return *tx, nil
 			}
-		}
-
-		if len(block.PrevBlockHash) == 0 {
-			break
 		}
 	}
 

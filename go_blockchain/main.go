@@ -5,6 +5,7 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"time"
 
 	"go_blockchain/network"
 	"go_blockchain/storage"
@@ -49,14 +50,24 @@ func main() {
 	defer storage.Close()
 	fmt.Printf("[%s] DB inizializzato con successo\n", nodeName)
 
-	server, err := network.StartServer(storage, walletFile, nodeName, nodeAddress)
+	server, err := network.StartServer(walletFile, nodeName, nodeAddress)
 	if err != nil {
 		fmt.Printf("[%s] Errore creazione server: %s \n", nodeName, err)
 	}
 
 	router := network.SetupRouter(server)
 
-	fmt.Printf("[%s] Nodo avviato sulla porta %s...\n", nodeName, listenPort)
+	go func() {
+		fmt.Printf("[%s] Nodo avviato sulla porta %s...\n", nodeName, listenPort)
+		if err := http.ListenAndServe(":8080", router); err != nil {
+			log.Fatalf("Errore server: %v", err)
+		}
+	}()
 
-	log.Fatal(http.ListenAndServe(":8080", router))
+	time.Sleep(time.Second)
+	if err := server.Bootstrap(storage); err != nil {
+		log.Fatalf("Errore durante il bootstrap: %v", err)
+	}
+
+	select {}
 }

@@ -24,7 +24,35 @@ services:
       - "8081:8080"
     volumes:
       - node1_data:/data
+  
+  node2:
+    build: .
+    container_name: node_2
+    environment:
+      - PORT=8082
+      - NODE_NAME=node2
+      - DB_FILE=/data/node2.db
+      - WALLET_FILE=/data/node2_wallet.dat
+    ports:
+      - "8082:8080"
+    volumes:
+      - node2_data:/data
+
+  node3:
+    build: .
+    container_name: node_3
+    environment:
+      - PORT=8083
+      - NODE_NAME=node3
+      - DB_FILE=/data/node3.db
+      - WALLET_FILE=/data/node3_wallet.dat
+    ports:
+      - "8083:8080"
+    volumes:
+      - node3_data:/data
 
 volumes:
   central_data:
   node1_data:
+  node2_data:
+  node3_data:

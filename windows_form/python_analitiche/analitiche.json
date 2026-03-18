@@ -1,17 +1,21 @@
 {
     "statistiche": {
-        "tempo_medio_mining": 654.0,
-        "totale_transazioni": 5,
-        "valore_medio_btc": 6.0,
-        "difficolta_media": 2.33,
+        "tempo_medio_mining": 101.33,
+        "totale_transazioni": 7,
+        "valore_medio_btc": 6.67,
+        "difficolta_media": 2.5,
         "top_ricchi": [
             [
-                "23513db6ea876ec5888f78bc0415d55a3704a995",
-                28.0
+                "5a81f2aee3a1c930b51b6e9042f0898f8b2b49de",
+                20.0
             ],
             [
-                "8ac6557a60627b14cf0d709a6c62b61ee14369e7",
-                2.0
+                "985b86d5af7b1166b598d46131b27cfc33ac0968",
+                15.0
+            ],
+            [
+                "cdadca39d350b6c2dd1f3c7555f5027db3e013cc",
+                3.0
             ]
         ]
     },
